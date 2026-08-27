@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "daily-cattle",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-26",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "ai": { "binding": "AI", "remote": true },
+  // Existing production KV namespace; retain this binding for deployment.
+  "kv_namespaces": [
+    { "binding": "STATE", "id": "eb36e91840db454fa0a00d12c098b1d9" }
+  ],
+  "triggers": {
+    "crons": ["45 23 * * *", "0 0 * * *"]
+  }
+}

@@ -1,0 +1,12 @@
+[
+  { "id": "wordpress:234123", "url": "https://pd.w.org/2026/07/296a697b0475c861.68075092-1024x768.jpg", "expected": "pass" },
+  { "id": "wordpress:220305", "url": "https://pd.w.org/2026/06/6076a246b8ddf3fd3.71611506-1024x683.jpg", "expected": "pass" },
+  { "id": "wordpress:198387", "url": "https://pd.w.org/2026/04/37769e3e37fd43491.19488756-1024x576.jpg", "expected": "pass" },
+  { "id": "wordpress:196511", "url": "https://pd.w.org/2026/04/69469e1010661fbd8.73614172-1024x768.jpeg", "expected": "pass" },
+  { "id": "wordpress:127290", "url": "https://pd.w.org/2025/04/233680fce5a0a1ad1.29801946-1024x768.jpg", "expected": "pass" },
+  { "id": "wordpress:229505", "url": "https://pd.w.org/2026/07/1596a528beb5c6349.63443660-1024x576.jpg", "expected": "reject" },
+  { "id": "wordpress:197224", "url": "https://pd.w.org/2026/04/65269e1cf90255cf9.45959761-1024x576.jpg", "expected": "reject" },
+  { "id": "wordpress:191930", "url": "https://pd.w.org/2026/04/83269d4a5f89658b2.80974906-1024x575.jpg", "expected": "reject" },
+  { "id": "wordpress:188739", "url": "https://pd.w.org/2026/03/76069c4c06a96b5b4.65686304-1024x737.jpg", "expected": "reject" },
+  { "id": "wordpress:184877", "url": "https://pd.w.org/2026/02/8656991addf801346.08343302-1024x965.jpeg", "expected": "reject" }
+]
