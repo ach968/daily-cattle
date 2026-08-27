@@ -2,6 +2,25 @@
 
 This Cloudflare Worker publishes one verified, high-quality, openly licensed photograph of cattle in a pasture for each UTC day. `GET /` and `GET /today` stream the same untouched upstream image bytes; `GET /today.json` provides the selected provider, canonical page, attribution, source URL, license, native dimensions, and selection metadata.
 
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph Selection["Daily selection (UTC)"]
+    Cron["Cron triggers"] --> Sources["WordPress Photos<br/>Wikimedia Commons"]
+    Sources --> Filters["License + native 1920×1080<br/>landscape filters"]
+    Filters --> AI["Workers AI<br/>quality gate ≥ 82"]
+    AI --> KV["Workers KV<br/>metadata + reserves"]
+  end
+
+  Client["Client"] --> Worker["Cloudflare Worker"]
+  Worker --> KV
+  Worker --> Cache["Cloudflare edge cache"]
+  Cache -. cache miss .-> Origin["Original provider image"]
+  Cache --> Image["/ or /today<br/>image bytes"]
+  Worker --> Metadata["/today.json<br/>metadata"]
+```
+
 ## Provider and selection policy
 
 The WordPress Photo Directory is the primary anonymous provider. Wikimedia Commons is the fallback only when WordPress cannot prepare the next image and fill available reserve slots. Discovery and selection run only in scheduled jobs; ordinary `/` and `/today` requests do not discover images or invoke Workers AI.
