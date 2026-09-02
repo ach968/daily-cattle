@@ -10,6 +10,7 @@
     "cf-typegen": "wrangler types",
     "benchmark": "tsx scripts/benchmark-quality.ts",
     "smoke": "node scripts/smoke.mjs",
+    "health": "node scripts/production-health.mjs",
     "deploy": "wrangler deploy"
   },
   "devDependencies": {

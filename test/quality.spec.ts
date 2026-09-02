@@ -92,32 +92,32 @@ describe("parseQualityResponse", () => {
     expect(result).toBeNull();
   });
 
-  it("passes at the exact quality threshold of 82", () => {
+  it("passes at the exact quality threshold of 75", () => {
     const result = parseQualityResponse({
-      technical: 26,
-      subject: 25,
-      composition: 16,
-      landscape: 11,
-      distractions: 4,
+      technical: 24,
+      subject: 23,
+      composition: 15,
+      landscape: 10,
+      distractions: 3,
       hardRejects: [],
       reasons: ["meets the quality bar"],
     });
 
-    expect(result).toMatchObject({ total: 82, passed: true });
+    expect(result).toMatchObject({ total: 75, passed: true });
   });
 
-  it("fails immediately below the quality threshold at 81", () => {
+  it("fails immediately below the quality threshold at 74", () => {
     const result = parseQualityResponse({
-      technical: 25,
-      subject: 25,
-      composition: 16,
-      landscape: 11,
-      distractions: 4,
+      technical: 24,
+      subject: 22,
+      composition: 15,
+      landscape: 10,
+      distractions: 3,
       hardRejects: [],
       reasons: ["just below the quality bar"],
     });
 
-    expect(result).toMatchObject({ total: 81, passed: false });
+    expect(result).toMatchObject({ total: 74, passed: false });
   });
 
   it.each([

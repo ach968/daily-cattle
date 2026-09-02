@@ -1,4 +1,4 @@
-export const QUALITY_THRESHOLD = 82;
+export const QUALITY_THRESHOLD = 75;
 export const MAX_DAILY_EVALUATIONS = 20;
 export const MAX_RESERVES = 9;
 export const MAX_RECENT_IDS = 30;

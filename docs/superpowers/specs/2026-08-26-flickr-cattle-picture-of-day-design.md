@@ -144,7 +144,7 @@ The 100-point rubric is:
 - 15 points: landscape and atmosphere
 - 5 points: absence of distracting elements
 
-The passing threshold is 82. The highest-scoring passing candidate becomes the prepared daily selection. Only other candidates scoring at least 82 may enter the reserve. Uncertain, incomplete, or malformed model output fails closed.
+The passing threshold is 75. The highest-scoring passing candidate becomes the prepared daily selection. Only other candidates scoring at least 75 may enter the reserve. Uncertain, incomplete, or malformed model output fails closed.
 
 The preparation job evaluates at most 20 previews per day by default to remain inside the Workers AI free allocation. It applies hard gates first, then evaluates the strongest remaining previews until it has prepared the day and filled available reserve slots or reaches that cap. The cap is configurable but the score threshold is not adaptive. A quota failure cannot lower the threshold.
 
@@ -228,7 +228,7 @@ No authentication tokens or API keys appear in KV metadata or responses. Flickr 
 ### Discovery or AI failure
 
 - Do not write incomplete prepared state.
-- Do not reduce the quality threshold.
+- Do not reduce the quality threshold dynamically or merely to force a run to pass; threshold changes require an explicit product-policy decision.
 - At promotion, use a valid reserve or retain yesterday's photograph.
 
 ### Selected Flickr image fails during a request

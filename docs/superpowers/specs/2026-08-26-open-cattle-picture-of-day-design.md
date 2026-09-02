@@ -164,7 +164,7 @@ The 100-point rubric remains:
 - 15: landscape and atmosphere
 - 5: absence of distractions
 
-The threshold remains 82. Malformed or uncertain AI output fails closed.
+The threshold is 75. Malformed or uncertain AI output fails closed.
 
 At most 20 previews are evaluated during one daily preparation run. This bounds Workers AI usage; it does not limit public image requests, provider searches, or reserve revalidation. Hard gates run first. If all 20 fail, the Worker retains verified state rather than lowering the threshold.
 
@@ -302,7 +302,7 @@ The service succeeds when:
 - Every newly selected image is an untouched native landscape original of at least 1920x1080.
 - Every image is CC0, public domain, CC BY, or CC BY-SA with complete source metadata.
 - WordPress is used first and Commons fills gaps without lowering quality.
-- Daily selection is automatic with a fixed threshold of 82 and at most 20 AI previews.
+- Daily selection is automatic with a fixed threshold of 75 and at most 20 AI previews.
 - The ready set maintains one prepared image and up to nine verified reserves.
 - Provider, AI, KV, cache, or source failures never admit an unchecked image.
 - The system has no paid runtime or image-provider dependency.

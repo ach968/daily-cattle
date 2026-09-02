@@ -33,7 +33,7 @@ Keep validation fail-closed. Malformed provider data, unsupported licenses, inva
 - Accept only native landscape images at least 1920 pixels wide and 1080 pixels high.
 - Stream original provider bytes; do not resize, crop, recompress, transform, or upscale images.
 - Accept only CC BY, CC BY-SA, CC0, or Public Domain licensing with canonical attribution metadata.
-- Keep the quality threshold at 82/100 and the shared preparation budget at no more than 20 AI evaluations per day.
+- Keep the quality threshold at 75/100 and the shared preparation budget at no more than 20 AI evaluations per day.
 - Keep provider order deterministic: WordPress first, Commons second.
 - Keep preparation and promotion scheduled for `23:45` and `00:00` UTC respectively.
 - Keep at most nine verified reserves and retain the last 30 served provider-scoped photo IDs.

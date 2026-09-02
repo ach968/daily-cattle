@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { QUALITY_THRESHOLD } from "../src/config";
 import type { OperationalLogger } from "../src/lifecycle";
 import type {
   EligiblePhoto,
@@ -108,7 +109,7 @@ class FakeScorer {
     if (assessment === null) return null;
     if (typeof assessment === "object") return assessment;
     const total = assessment ?? 90;
-    return quality({ total, passed: total >= 82 });
+    return quality({ total, passed: total >= QUALITY_THRESHOLD });
   }
 }
 
@@ -161,7 +162,7 @@ function providerEntry(
     photoId: `${provider}:${providerId}`,
     sourceUrl: `https://example.com/${provider}/${providerId}/source.jpg`,
     previewUrl: `https://example.com/${provider}/${providerId}/preview.jpg`,
-    quality: quality({ total, passed: total >= 82 }),
+    quality: quality({ total, passed: total >= QUALITY_THRESHOLD }),
   });
 }
 
@@ -223,7 +224,7 @@ describe("SelectionEngine.prepare", () => {
     const wordpressCandidates = candidates("wordpress", "primary", 15);
     const commonsCandidates = candidates("commons", "fallback", 10);
     const assessments = new Map<string, number>(
-      wordpressCandidates.map(({ photo }) => [photo.photoId, 81]),
+      wordpressCandidates.map(({ photo }) => [photo.photoId, 74]),
     );
     const { engine, scorer } = harness({
       wordpress: { recent: wordpressCandidates, all: [] },
@@ -529,7 +530,7 @@ describe("SelectionEngine.prepare", () => {
     });
     const { engine } = harness({
       wordpress: { recent: [candidate("wordpress", "failing")] },
-      assessments: new Map([["wordpress:failing", 81]]),
+      assessments: new Map([["wordpress:failing", 74]]),
     });
 
     const result = await engine.prepare(state, PREPARE_TIME);

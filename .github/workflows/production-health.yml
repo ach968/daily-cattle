@@ -1,0 +1,30 @@
+name: Production health
+
+on:
+  schedule:
+    - cron: "17 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-health
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify today's cattle
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check Cloudflare production state
+        env:
+          SERVICE_URL: https://daily-cattle.andrewkkchen.workers.dev
+        run: npm run health
