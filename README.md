@@ -96,7 +96,7 @@ The smoke check downloads `/` and `/today`, confirms byte-identical image respon
 
 ## Production health monitoring
 
-Cloudflare remains the scheduler for preparation and promotion. GitHub Actions runs a separate production check daily at `00:17 UTC`, after promotion, and can also be run manually from the repository's Actions tab. The check fails when `/today.json` is unavailable, stale, retained from the previous day, malformed, or below the 75-point quality threshold. A reserve promotion is healthy because it still produces a new verified daily selection.
+Cloudflare remains the scheduler for preparation and promotion. GitHub Actions runs a separate production check every 12 hours at `00:17` and `12:17 UTC`, after the corresponding preparation window, and can also be run manually from the repository's Actions tab. The check fails when `/today.json` is unavailable, stale, retained from the previous day, malformed, or below the 75-point quality threshold. A reserve promotion is healthy because it still produces a new verified daily selection.
 
 Run the same check locally with:
 
