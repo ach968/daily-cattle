@@ -49,7 +49,13 @@ const worker = {
   async scheduled(controller, env, ctx) {
     const repository = new StateRepository(env.STATE);
     const providers = createProviderRegistry();
-    const scorer = new QualityScorer(env.AI, runtimeFetch);
+    const scorer = new QualityScorer(env.AI, runtimeFetch, (failure) => {
+      consoleLogger.error({
+        event: "quality_scoring_failed",
+        at: new Date(controller.scheduledTime).toISOString(),
+        ...failure,
+      });
+    });
     const selector = new SelectionEngine(providers, scorer, consoleLogger);
     const deps = { repository, providers, selector, logger: consoleLogger };
 

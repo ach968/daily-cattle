@@ -5,10 +5,18 @@ const VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct" as const;
 export const QUALITY_MAX_TOKENS = 32;
 
 export const QUALITY_PROMPT = `Evaluate this image as a standalone daily photograph of cattle grazing outdoors in a pasture. Award integer points for technical quality (maximum 30), cattle visibility and pasture relevance (maximum 30), composition (maximum 20), landscape atmosphere (maximum 15), and a clean distraction-free frame (maximum 5). Higher is always better. Use the full range. A sharp, attractive pasture photo with prominent cattle and no hard reject should normally total 82 to 95. Hard reject non-photographs or synthetic-looking images; dominant people or machinery; cattle that are tiny, distant, or insignificant; watermarks, borders, or text; blur, noise, compression damage, severe exposure/color problems; or weak standalone composition.
-Return exactly one line: SCORE|technical points|subject points|composition points|landscape points|clean-frame points|PASS
-Replace PASS with REJECT if any hard-reject rule applies. Output only the line, using six vertical bars and no labels, explanation, or placeholders.`;
+Return exactly one line: SCORE|technical points|subject points|composition points|landscape points|clean-frame points|hard-reject flag|PASS
+Use 0 when there is no hard reject and 1 when there is. PASS requires a 0 flag; replace PASS with REJECT and use a 1 flag if any hard-reject rule applies. Output only the line, using seven vertical bars and no labels, explanation, or placeholders.`;
 
 type QualityComponents = Omit<QualityAssessment, "total" | "passed">;
+
+export interface QualityScoringFailure {
+  photoId: string;
+  stage: "preview" | "ai" | "parse";
+  detail: string;
+}
+
+export type QualityFailureReporter = (failure: QualityScoringFailure) => void;
 
 const componentBounds = {
   technical: 30,
@@ -60,13 +68,25 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
+function errorName(error: unknown): string {
+  return error instanceof Error ? error.name : "unknown error";
+}
+
 export function parseQualityResponse(value: unknown): QualityAssessment | null {
   const candidate = unwrapResponse(value);
   if (typeof candidate === "string") {
-    const match = /^SCORE\|(\d+)\|(\d+)\|(\d+)\|(\d+)\|(\d+)\|(PASS|REJECT)$/.exec(
+    const match = /^SCORE\|(\d+)\|(\d+)\|(\d+)\|(\d+)\|(\d+)\|(?:(0|1)\|)?(PASS|REJECT)$/.exec(
       candidate.trim(),
     );
     if (!match) return null;
+    const hardRejectFlag = match[6];
+    const verdict = match[7];
+    if (
+      hardRejectFlag !== undefined &&
+      (hardRejectFlag === "1") !== (verdict === "REJECT")
+    ) {
+      return null;
+    }
 
     const components: QualityComponents = {
       technical: Number(match[1]),
@@ -74,7 +94,7 @@ export function parseQualityResponse(value: unknown): QualityAssessment | null {
       composition: Number(match[3]),
       landscape: Number(match[4]),
       distractions: Number(match[5]),
-      hardRejects: match[6] === "REJECT" ? ["vision model hard rejection"] : [],
+      hardRejects: verdict === "REJECT" ? ["vision model hard rejection"] : [],
       reasons: [],
     };
     for (const [field, maximum] of Object.entries(componentBounds)) {
@@ -143,26 +163,57 @@ export class QualityScorer {
   constructor(
     private readonly ai: Pick<Ai, "run">,
     private readonly fetcher: typeof fetch = fetch,
+    private readonly reportFailure: QualityFailureReporter = () => undefined,
   ) {}
 
   async score(photo: EligiblePhoto): Promise<QualityAssessment | null> {
+    let image: number[];
     try {
       const preview = await this.fetcher(photo.previewUrl);
       if (!preview.ok) {
+        this.reportFailure({
+          photoId: photo.photoId,
+          stage: "preview",
+          detail: `preview request returned HTTP ${preview.status}`,
+        });
         return null;
       }
 
-      const image = Array.from(new Uint8Array(await preview.arrayBuffer()));
-      const result = await this.ai.run(VISION_MODEL, {
+      image = Array.from(new Uint8Array(await preview.arrayBuffer()));
+    } catch (error: unknown) {
+      this.reportFailure({
+        photoId: photo.photoId,
+        stage: "preview",
+        detail: `preview request failed with ${errorName(error)}`,
+      });
+      return null;
+    }
+
+    let result: unknown;
+    try {
+      result = await this.ai.run(VISION_MODEL, {
         image,
         prompt: QUALITY_PROMPT,
         temperature: 0,
         max_tokens: QUALITY_MAX_TOKENS,
       });
-
-      return parseQualityResponse(result);
-    } catch {
+    } catch (error: unknown) {
+      this.reportFailure({
+        photoId: photo.photoId,
+        stage: "ai",
+        detail: `Workers AI request failed with ${errorName(error)}`,
+      });
       return null;
     }
+
+    const assessment = parseQualityResponse(result);
+    if (!assessment) {
+      this.reportFailure({
+        photoId: photo.photoId,
+        stage: "parse",
+        detail: "Workers AI response did not match the quality schema",
+      });
+    }
+    return assessment;
   }
 }

@@ -17,6 +17,13 @@ const passingComponents = {
   reasons: ["sharp cattle in a green pasture"],
 };
 
+it("requests an explicit hard-reject flag from the vision model", () => {
+  expect(QUALITY_PROMPT).toContain(
+    "SCORE|technical points|subject points|composition points|landscape points|clean-frame points|hard-reject flag|PASS",
+  );
+  expect(QUALITY_PROMPT).toContain("Use 0 when there is no hard reject and 1 when there is");
+});
+
 describe("parseQualityResponse", () => {
   it("computes a passing score from bounded components", () => {
     const result = parseQualityResponse(passingComponents);
@@ -67,6 +74,30 @@ describe("parseQualityResponse", () => {
       total: 88,
       passed: true,
     });
+  });
+
+  it("parses the vision model's explicit zero hard-reject flag", () => {
+    const result = parseQualityResponse({
+      response: "SCORE|30|30|20|15|5|0|PASS",
+    });
+
+    expect(result).toMatchObject({
+      technical: 30,
+      subject: 30,
+      composition: 20,
+      landscape: 15,
+      distractions: 5,
+      hardRejects: [],
+      total: 100,
+      passed: true,
+    });
+  });
+
+  it.each([
+    "SCORE|30|30|20|15|5|1|PASS",
+    "SCORE|30|30|20|15|5|0|REJECT",
+  ])("rejects a contradictory hard-reject flag in %s", (response) => {
+    expect(parseQualityResponse(response)).toBeNull();
   });
 
   it("fails a compact score carrying the model's hard-reject marker", () => {
@@ -145,7 +176,7 @@ describe("parseQualityResponse", () => {
 
 describe("QualityScorer", () => {
   it("scores fetched preview bytes with deterministic vision settings", async () => {
-    const run = vi.fn().mockResolvedValue({ response: "SCORE|27|28|17|12|4|PASS" });
+    const run = vi.fn().mockResolvedValue({ response: "SCORE|27|28|17|12|4|0|PASS" });
     const fetcher = vi.fn().mockResolvedValue(
       new Response(new Uint8Array([12, 34, 56]), {
         status: 200,
@@ -170,29 +201,80 @@ describe("QualityScorer", () => {
     expect(run.mock.calls[0]?.[1]).not.toHaveProperty("response_format");
   });
 
+  it("reports a parse-stage failure without exposing image data", async () => {
+    const run = vi.fn().mockResolvedValue({ response: "unexpected output" });
+    const fetcher = vi.fn().mockResolvedValue(new Response(new Uint8Array([1, 2, 3])));
+    const reportFailure = vi.fn();
+    const scorer = new QualityScorer(
+      { run } as unknown as Pick<Ai, "run">,
+      fetcher,
+      reportFailure,
+    );
+
+    await expect(scorer.score(eligiblePhoto())).resolves.toBeNull();
+    expect(reportFailure).toHaveBeenCalledWith({
+      photoId: "wordpress:234123",
+      stage: "parse",
+      detail: "Workers AI response did not match the quality schema",
+    });
+    expect(JSON.stringify(reportFailure.mock.calls)).not.toContain("unexpected output");
+  });
+
   it("returns null when the preview response is unsuccessful", async () => {
     const run = vi.fn();
     const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 503 }));
-    const scorer = new QualityScorer({ run } as unknown as Pick<Ai, "run">, fetcher);
+    const reportFailure = vi.fn();
+    const scorer = new QualityScorer(
+      { run } as unknown as Pick<Ai, "run">,
+      fetcher,
+      reportFailure,
+    );
 
     await expect(scorer.score(eligiblePhoto())).resolves.toBeNull();
     expect(run).not.toHaveBeenCalled();
+    expect(reportFailure).toHaveBeenCalledWith({
+      photoId: "wordpress:234123",
+      stage: "preview",
+      detail: "preview request returned HTTP 503",
+    });
   });
 
   it("returns null when fetching the preview throws", async () => {
     const run = vi.fn();
     const fetcher = vi.fn().mockRejectedValue(new Error("network failure"));
-    const scorer = new QualityScorer({ run } as unknown as Pick<Ai, "run">, fetcher);
+    const reportFailure = vi.fn();
+    const scorer = new QualityScorer(
+      { run } as unknown as Pick<Ai, "run">,
+      fetcher,
+      reportFailure,
+    );
 
     await expect(scorer.score(eligiblePhoto())).resolves.toBeNull();
     expect(run).not.toHaveBeenCalled();
+    expect(reportFailure).toHaveBeenCalledWith({
+      photoId: "wordpress:234123",
+      stage: "preview",
+      detail: "preview request failed with Error",
+    });
+    expect(JSON.stringify(reportFailure.mock.calls)).not.toContain("network failure");
   });
 
   it("returns null when Workers AI throws", async () => {
     const run = vi.fn().mockRejectedValue(new Error("AI quota exceeded"));
     const fetcher = vi.fn().mockResolvedValue(new Response(new Uint8Array([1, 2, 3])));
-    const scorer = new QualityScorer({ run } as unknown as Pick<Ai, "run">, fetcher);
+    const reportFailure = vi.fn();
+    const scorer = new QualityScorer(
+      { run } as unknown as Pick<Ai, "run">,
+      fetcher,
+      reportFailure,
+    );
 
     await expect(scorer.score(eligiblePhoto())).resolves.toBeNull();
+    expect(reportFailure).toHaveBeenCalledWith({
+      photoId: "wordpress:234123",
+      stage: "ai",
+      detail: "Workers AI request failed with Error",
+    });
+    expect(JSON.stringify(reportFailure.mock.calls)).not.toContain("AI quota exceeded");
   });
 });
