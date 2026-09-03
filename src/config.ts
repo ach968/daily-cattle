@@ -1,9 +1,9 @@
 export const QUALITY_THRESHOLD = 75;
-export const MAX_DAILY_EVALUATIONS = 20;
+export const MAX_EVALUATIONS_PER_PREPARATION = 20;
 export const MAX_RESERVES = 9;
 export const MAX_RECENT_IDS = 30;
 export const STATE_KEY = "service-state:v2";
-export const PREPARE_CRON = "45 23 * * *";
+export const PREPARE_CRON = "45 11,23 * * *";
 export const PROMOTE_CRON = "0 0 * * *";
 export const WORDPRESS_ENDPOINT =
   "https://wordpress.org/photos/wp-json/wp/v2/photos";

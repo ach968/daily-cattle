@@ -49,7 +49,7 @@ The runtime remains entirely on Cloudflare's free-tier components:
 - One Cloudflare Worker
 - One Workers KV namespace for versioned metadata
 - One Workers AI binding using `@cf/meta/llama-3.2-11b-vision-instruct`
-- Cron Triggers at 23:45 UTC and 00:00 UTC
+- Cron Triggers for preparation at 11:45 and 23:45 UTC and promotion at 00:00 UTC
 - The Cache API for successful daily image responses
 
 The existing production KV namespace is retained. No public Worker has been deployed, so the provider-neutral state schema can replace the pre-deployment Flickr schema without migration compatibility.
@@ -112,13 +112,13 @@ Commons queries use a descriptive User-Agent, serial or tightly bounded requests
 
 ## Discovery and Selection
 
-The 23:45 UTC preparation job performs these steps:
+Each 11:45 and 23:45 UTC preparation job performs these steps:
 
 1. Read the complete current state.
 2. Revalidate existing reserves with their originating providers.
 3. Search and hard-filter WordPress candidates.
-4. Score eligible WordPress previews until the ready set is full, candidates are exhausted, or the daily AI budget requires consulting the fallback pool.
-5. If one next image plus nine reserves are not available, search, hard-filter, and score Commons candidates with the remaining AI budget.
+4. Score eligible WordPress previews until the ready set is full, candidates are exhausted, or the per-run AI budget requires consulting the fallback pool.
+5. If one next image plus nine reserves are not available, search, hard-filter, and score Commons candidates with the remaining per-run AI budget.
 6. Rank all passing candidates by quality score, then provider search rank, provider priority, and a UTC-date hash used only as a deterministic tie-breaker.
 7. Store one prepared next-day image and up to nine ordered reserves as a complete state document.
 
@@ -166,11 +166,11 @@ The 100-point rubric remains:
 
 The threshold is 75. Malformed or uncertain AI output fails closed.
 
-At most 20 previews are evaluated during one daily preparation run. This bounds Workers AI usage; it does not limit public image requests, provider searches, or reserve revalidation. Hard gates run first. If all 20 fail, the Worker retains verified state rather than lowering the threshold.
+At most 20 previews are evaluated during one preparation run. This bounds Workers AI usage to at most 40 previews per UTC day; it does not limit public image requests, provider searches, or reserve revalidation. Hard gates run first. If all 20 fail, the Worker retains verified state rather than lowering the threshold.
 
 ## Daily Lifecycle
 
-### Preparation at 23:45 UTC
+### Preparation at 11:45 and 23:45 UTC
 
 - Revalidate reserves across both providers.
 - Discover and score fresh candidates in provider order.
@@ -302,7 +302,7 @@ The service succeeds when:
 - Every newly selected image is an untouched native landscape original of at least 1920x1080.
 - Every image is CC0, public domain, CC BY, or CC BY-SA with complete source metadata.
 - WordPress is used first and Commons fills gaps without lowering quality.
-- Daily selection is automatic with a fixed threshold of 75 and at most 20 AI previews.
+- Daily selection is automatic with a fixed threshold of 75 and at most 20 AI previews per preparation run.
 - The ready set maintains one prepared image and up to nine verified reserves.
 - Provider, AI, KV, cache, or source failures never admit an unchecked image.
 - The system has no paid runtime or image-provider dependency.

@@ -72,7 +72,7 @@ It prints one result per preview and exits nonzero unless all ten expectations m
 
 ## Scheduled bootstrap and smoke check
 
-Preparation runs at `45 23 * * *` and promotion runs at `0 0 * * *`, both in UTC. After deployment, initialize production state through those scheduled handlers:
+Preparation runs every 12 hours at `45 11,23 * * *`, while promotion remains daily at `0 0 * * *`; both schedules use UTC. After deployment, initialize production state through those scheduled handlers:
 
 ```bash
 npx wrangler dev --remote --test-scheduled
@@ -81,7 +81,7 @@ npx wrangler dev --remote --test-scheduled
 In a second terminal, invoke:
 
 ```bash
-curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=45+23+*+*+*&time=1787787900000&format=json"
+curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=45+11%2C23+*+*+*&time=1787787900000&format=json"
 curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=0+0+*+*+*&time=1787788800000&format=json"
 ```
 

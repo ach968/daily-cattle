@@ -1,5 +1,5 @@
 import {
-  MAX_DAILY_EVALUATIONS,
+  MAX_EVALUATIONS_PER_PREPARATION,
   MAX_RESERVES,
   QUALITY_THRESHOLD,
 } from "./config";
@@ -183,7 +183,7 @@ export class SelectionEngine {
       for (const pass of ["recent", "all"] satisfies SearchPass[]) {
         if (
           passers.length >= requiredFreshPassers ||
-          evaluationCount >= MAX_DAILY_EVALUATIONS
+          evaluationCount >= MAX_EVALUATIONS_PER_PREPARATION
         ) {
           break;
         }
@@ -207,7 +207,7 @@ export class SelectionEngine {
         for (const candidate of ordered) {
           if (
             passers.length >= requiredFreshPassers ||
-            evaluationCount >= MAX_DAILY_EVALUATIONS
+            evaluationCount >= MAX_EVALUATIONS_PER_PREPARATION
           ) {
             break;
           }
