@@ -8,7 +8,7 @@
 
 ## Purpose
 
-Provide a stable public URL that returns one high-quality photograph of cattle grazing in a pasture for each UTC day. Selection is automatic, the source image is natively at least 1920x1080 and landscape, and the Worker never resizes, crops, recompresses, or upscales it.
+Provide a stable public URL that returns one high-quality photograph of cattle grazing in a pasture for each 12-hour UTC slot. Selection is automatic, the source image is natively at least 1920x1080 and landscape, and the Worker never resizes, crops, recompresses, or upscales it.
 
 Image quality takes priority over novelty. If discovery produces no passing photograph, the service promotes a previously verified reserve or retains the current verified image. It stores provider metadata and selection state, but never stores image bytes in KV or permanent object storage.
 
@@ -20,16 +20,16 @@ This design supersedes the Flickr-keyed design. It removes all paid and keyed im
 
 Returns the current photograph as image bytes.
 
-- The URL remains stable and the selection normally remains unchanged for the UTC day.
+- The URL remains stable and the selection normally remains unchanged for the current 12-hour UTC slot.
 - The upstream format, bytes, and aspect ratio are preserved.
 - Native width is at least 1920 pixels, native height is at least 1080 pixels, and width exceeds height.
-- Headers include the upstream `Content-Type`, `ETag`, CORS, cache lifetime ending at the next UTC midnight, a `describedby` link to `/today.json`, and a canonical link to the provider page.
+- Headers include the upstream `Content-Type`, `ETag`, CORS, cache lifetime ending at the next `00:00` or `12:00 UTC` boundary, a `describedby` link to `/today.json`, and a canonical link to the provider page.
 
 ### `GET /today.json`
 
 Returns:
 
-- UTC selection date
+- UTC selection date and 12-hour slot boundary
 - Provider and provider-specific photo ID
 - Title or description
 - Creator name and profile URL when supplied
@@ -49,8 +49,8 @@ The runtime remains entirely on Cloudflare's free-tier components:
 - One Cloudflare Worker
 - One Workers KV namespace for versioned metadata
 - One Workers AI binding using `@cf/meta/llama-3.2-11b-vision-instruct`
-- Cron Triggers for preparation at 11:45 and 23:45 UTC and promotion at 00:00 UTC
-- The Cache API for successful daily image responses
+- Cron Triggers for preparation at 11:45 and 23:45 UTC and promotion at 12:00 and 00:00 UTC
+- The Cache API for successful slot image responses
 
 The existing production KV namespace is retained. No public Worker has been deployed, so the provider-neutral state schema can replace the pre-deployment Flickr schema without migration compatibility.
 
@@ -120,7 +120,7 @@ Each 11:45 and 23:45 UTC preparation job performs these steps:
 4. Score eligible WordPress previews until the ready set is full, candidates are exhausted, or the per-run AI budget requires consulting the fallback pool.
 5. If one next image plus nine reserves are not available, search, hard-filter, and score Commons candidates with the remaining per-run AI budget.
 6. Rank all passing candidates by quality score, then provider search rank, provider priority, and a UTC-date hash used only as a deterministic tie-breaker.
-7. Store one prepared next-day image and up to nine ordered reserves as a complete state document.
+7. Store one image prepared for the next 12-hour slot and up to nine ordered reserves as a complete state document.
 
 The service excludes the current image, existing reserves, and the last 30 served provider-prefixed IDs. Search results are deduplicated by provider ID and normalized source URL.
 
@@ -168,21 +168,21 @@ The threshold is 75. Malformed or uncertain AI output fails closed.
 
 At most 20 previews are evaluated during one preparation run. This bounds Workers AI usage to at most 40 previews per UTC day; it does not limit public image requests, provider searches, or reserve revalidation. Hard gates run first. If all 20 fail, the Worker retains verified state rather than lowering the threshold.
 
-## Daily Lifecycle
+## 12-Hour Lifecycle
 
 ### Preparation at 11:45 and 23:45 UTC
 
 - Revalidate reserves across both providers.
 - Discover and score fresh candidates in provider order.
-- Prepare tomorrow's highest-scoring passing candidate.
+- Prepare the next slot's highest-scoring passing candidate.
 - Refill the reserve to at most nine entries.
 - Preserve the previous complete state if preparation throws or cannot produce a valid next image.
 
-### Promotion at 00:00 UTC
+### Promotion at 00:00 and 12:00 UTC
 
 - Promote the prepared candidate when it remains valid.
 - Otherwise promote the highest-scoring valid reserve.
-- Otherwise retain yesterday's verified image.
+- Otherwise retain the previous slot's verified image.
 - Add the image that stopped being current to the bounded recent-ID history, not back to the reserve.
 
 Provider type does not affect promotion priority after candidates have passed all gates.
@@ -194,7 +194,7 @@ On a `/today` cache miss:
 1. Read the complete current state from KV.
 2. Fetch the exact validated provider source URL.
 3. Retry once for a transient upstream failure.
-4. Stream successful bytes untouched and cache them until the next UTC midnight.
+4. Stream successful bytes untouched and cache them until the next 12-hour UTC boundary.
 5. On persistent source failure, revalidate and conditionally promote a reserve using its originating provider.
 6. Return `502` if no checked image can be served.
 
@@ -210,10 +210,10 @@ KV stores one versioned document containing:
 
 - Schema version
 - Current selection
-- Optional prepared next-day selection
+- Optional selection prepared for the next 12-hour slot
 - Ordered reserves, maximum nine
 - Last 30 served provider-prefixed IDs
-- Last preparation and promotion outcomes
+- Last preparation and promotion outcomes; the promotion timestamp identifies the current public slot
 
 Every selection contains:
 
@@ -233,7 +233,7 @@ No authentication material or image bytes enter KV or public metadata.
 
 ## Failure Handling
 
-- **Primary discovery failure:** continue with Commons using the remaining daily AI budget.
+- **Primary discovery failure:** continue with Commons using the remaining per-run AI budget.
 - **Both providers fail:** keep verified reserves and existing prepared state; do not lower gates.
 - **Transient revalidation failure:** preserve the previously verified entry but do not admit an unverified fresh candidate.
 - **Definitive invalidation:** remove the entry and continue to the next checked reserve.
@@ -298,11 +298,11 @@ This version excludes a custom domain, gallery, permanent image storage, multipl
 
 The service succeeds when:
 
-- A stable public `/today` URL returns one verified cattle/pasture photograph per UTC day.
+- A stable public `/today` URL returns one verified cattle/pasture photograph per 12-hour UTC slot.
 - Every newly selected image is an untouched native landscape original of at least 1920x1080.
 - Every image is CC0, public domain, CC BY, or CC BY-SA with complete source metadata.
 - WordPress is used first and Commons fills gaps without lowering quality.
-- Daily selection is automatic with a fixed threshold of 75 and at most 20 AI previews per preparation run.
+- Slot selection is automatic with a fixed threshold of 75 and at most 20 AI previews per preparation run.
 - The ready set maintains one prepared image and up to nine verified reserves.
 - Provider, AI, KV, cache, or source failures never admit an unchecked image.
 - The system has no paid runtime or image-provider dependency.

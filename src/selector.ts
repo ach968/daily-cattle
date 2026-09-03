@@ -3,7 +3,7 @@ import {
   MAX_RESERVES,
   QUALITY_THRESHOLD,
 } from "./config";
-import { nextUtcDate, utcDate } from "./day";
+import { nextUtcSlotDate, utcDate } from "./day";
 import type { OperationalLogger } from "./lifecycle";
 import type { SelectionEntry, ServiceState } from "./model";
 import {
@@ -150,7 +150,7 @@ export class SelectionEngine {
   async prepare(state: ServiceState, nowMs: number): Promise<ServiceState> {
     const timestamp = new Date(nowMs).toISOString();
     const preparationDate = utcDate(nowMs);
-    const intendedDate = nextUtcDate(nowMs);
+    const intendedDate = nextUtcSlotDate(nowMs);
     const revalidatedReserve = await availableReserve(
       this.providers,
       state.reserve,

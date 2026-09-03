@@ -3,6 +3,13 @@ import { pathToFileURL } from "node:url";
 
 export const PRODUCTION_QUALITY_THRESHOLD = 75;
 
+function currentUtcSlot(date) {
+  const slot = new Date(date);
+  slot.setUTCMinutes(0, 0, 0);
+  slot.setUTCHours(slot.getUTCHours() < 12 ? 0 : 12);
+  return slot.toISOString();
+}
+
 export async function runProductionHealthCheck(
   serviceUrl,
   fetcher = fetch,
@@ -16,7 +23,8 @@ export async function runProductionHealthCheck(
   const metadata = await response.json();
   assert.ok(metadata && typeof metadata === "object", "metadata must be an object");
   assert.equal(metadata.date, now.toISOString().slice(0, 10), "selection date is not today in UTC");
-  assert.notEqual(metadata.origin, "retained", "selection was retained from the previous UTC day");
+  assert.equal(metadata.slot, currentUtcSlot(now), "selection is not from the current 12-hour UTC slot");
+  assert.notEqual(metadata.origin, "retained", "selection was retained from the previous UTC slot");
   assert.ok(
     metadata.origin === "fresh" || metadata.origin === "reserve",
     "selection origin must be fresh or reserve",
@@ -31,6 +39,7 @@ export async function runProductionHealthCheck(
 
   return {
     date: metadata.date,
+    slot: metadata.slot,
     photoId: metadata.photoId,
     origin: metadata.origin,
     score: metadata.quality.total,
@@ -40,7 +49,7 @@ export async function runProductionHealthCheck(
 async function main() {
   const result = await runProductionHealthCheck(process.env.SERVICE_URL);
   console.log(
-    `Production healthy: ${result.photoId} for ${result.date} ` +
+    `Production healthy: ${result.photoId} for ${result.slot} ` +
       `(${result.origin}, score ${result.score})`,
   );
 }

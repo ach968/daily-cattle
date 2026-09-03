@@ -16,6 +16,8 @@ import { entry, quality, serviceState } from "./factories";
 
 const PREPARATION_TIME = Date.parse("2026-08-26T23:45:00.000Z");
 const PROMOTION_TIME = Date.parse("2026-08-27T00:00:00.000Z");
+const MORNING_PREPARATION_TIME = Date.parse("2026-08-26T11:45:00.000Z");
+const NOON_PROMOTION_TIME = Date.parse("2026-08-26T12:00:00.000Z");
 
 class MemoryRepository {
   readonly writeCalls: ServiceState[] = [];
@@ -110,7 +112,27 @@ function lifecycleDeps(options: HarnessOptions = {}): LifecycleDeps & {
 }
 
 describe("runPreparation", () => {
-  it("writes the complete state only after a successful next-day selection", async () => {
+  it("accepts a candidate prepared for the upcoming noon slot", async () => {
+    const prepared = serviceState({
+      next: entry({ photoId: "noon", intendedDate: "2026-08-26" }),
+      lastPreparation: {
+        at: "2026-08-26T11:45:00.000Z",
+        status: "success",
+        detail: "prepared noon",
+      },
+    });
+    const deps = lifecycleDeps({ prepared });
+
+    await runPreparation(deps, MORNING_PREPARATION_TIME);
+
+    expect(deps.repository.saved?.next?.photoId).toBe("noon");
+    expect(deps.logger.infos[0]).toMatchObject({
+      event: "preparation_success",
+      photoId: "noon",
+    });
+  });
+
+  it("writes the complete state only after a successful next-slot selection", async () => {
     const current = entry({ photoId: "current" });
     const prepared = serviceState({
       current,
@@ -177,6 +199,23 @@ describe("runPreparation", () => {
 });
 
 describe("runPromotion", () => {
+  it("promotes the prepared candidate at the noon UTC boundary", async () => {
+    const deps = lifecycleDeps({
+      current: entry({ photoId: "morning", intendedDate: "2026-08-26" }),
+      next: entry({ photoId: "afternoon", intendedDate: "2026-08-26" }),
+    });
+
+    await runPromotion(deps, NOON_PROMOTION_TIME);
+
+    expect(deps.repository.saved?.current).toMatchObject({
+      photoId: "afternoon",
+      intendedDate: "2026-08-26",
+      origin: "fresh",
+    });
+    expect(deps.repository.saved?.next).toBeUndefined();
+    expect(deps.repository.saved?.recentPhotoIds).toEqual(["morning"]);
+  });
+
   it("promotes the prepared candidate for the current UTC date", async () => {
     const deps = lifecycleDeps({
       current: entry({ photoId: "yesterday", intendedDate: "2026-08-26" }),
@@ -378,7 +417,7 @@ describe("runPromotion", () => {
     expect(deps.logger.errors.every((event) => event.transient === true)).toBe(true);
   });
 
-  it("retains yesterday when neither next nor reserve is valid", async () => {
+  it("retains the previous selection when neither next nor reserve is valid", async () => {
     const deps = lifecycleDeps({
       current: entry({ photoId: "yesterday", intendedDate: "2026-08-26" }),
       reserve: [entry({ photoId: "gone" })],

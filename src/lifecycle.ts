@@ -1,11 +1,9 @@
 import { MAX_RECENT_IDS } from "./config";
-import { utcDate } from "./day";
+import { nextUtcSlotDate, utcDate } from "./day";
 import type { RunOutcome, SelectionEntry, ServiceState } from "./model";
 import type { ProviderRegistry } from "./providers";
 import type { SelectionEngine } from "./selector";
 import type { StateRepository } from "./state";
-
-const ONE_DAY_MS = 86_400_000;
 
 export interface OperationalLogger {
   info(event: Record<string, unknown>): void;
@@ -79,7 +77,7 @@ export async function runPreparation(
   try {
     state = await deps.repository.read();
     const prepared = await deps.selector.prepare(state, nowMs);
-    const expectedDate = utcDate(nowMs + ONE_DAY_MS);
+    const expectedDate = nextUtcSlotDate(nowMs);
     if (
       prepared.lastPreparation?.status !== "success" ||
       prepared.next?.intendedDate !== expectedDate
@@ -87,7 +85,7 @@ export async function runPreparation(
       deps.logger.error({
         event: "preparation_failed",
         at: new Date(nowMs).toISOString(),
-        message: prepared.lastPreparation?.detail ?? "no valid next-day selection",
+        message: prepared.lastPreparation?.detail ?? "no valid next-slot selection",
         currentPhotoId: state.current?.photoId,
         reserveDepth: state.reserve.length,
       });

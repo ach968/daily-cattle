@@ -4,7 +4,7 @@ export const MAX_RESERVES = 9;
 export const MAX_RECENT_IDS = 30;
 export const STATE_KEY = "service-state:v2";
 export const PREPARE_CRON = "45 11,23 * * *";
-export const PROMOTE_CRON = "0 0 * * *";
+export const PROMOTE_CRON = "0 0,12 * * *";
 export const WORDPRESS_ENDPOINT =
   "https://wordpress.org/photos/wp-json/wp/v2/photos";
 export const WORDPRESS_LANDSCAPE_ORIENTATION_ID = 23;

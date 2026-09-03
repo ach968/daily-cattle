@@ -1,6 +1,6 @@
-import { secondsUntilNextUtcMidnight } from "./day";
+import { currentUtcSlot, secondsUntilNextUtcSlot } from "./day";
 import type { OperationalLogger } from "./lifecycle";
-import type { SelectionEntry } from "./model";
+import type { RunOutcome, SelectionEntry } from "./model";
 import type { StateRepository } from "./state";
 
 export interface ResponseCache {
@@ -121,7 +121,7 @@ function publicImageResponse(
   const origin = new URL(request.url).origin;
   headers.set(
     "cache-control",
-    `public, max-age=${secondsUntilNextUtcMidnight(nowMs)}`,
+    `public, max-age=${secondsUntilNextUtcSlot(nowMs)}`,
   );
   headers.set("access-control-allow-origin", "*");
   headers.set(
@@ -142,10 +142,18 @@ function publicImageResponse(
   });
 }
 
-function metadataResponse(current: SelectionEntry, nowMs: number): Response {
+function metadataResponse(
+  current: SelectionEntry,
+  lastPromotion: RunOutcome | undefined,
+  nowMs: number,
+): Response {
+  const slot = lastPromotion === undefined
+    ? undefined
+    : currentUtcSlot(Date.parse(lastPromotion.at));
   return Response.json(
     {
       date: current.intendedDate,
+      ...(slot === undefined ? {} : { slot }),
       photoId: current.photoId,
       provider: current.provider,
       providerId: current.providerId,
@@ -168,7 +176,7 @@ function metadataResponse(current: SelectionEntry, nowMs: number): Response {
     {
       headers: {
         "access-control-allow-origin": "*",
-        "cache-control": `public, max-age=${secondsUntilNextUtcMidnight(nowMs)}`,
+        "cache-control": `public, max-age=${secondsUntilNextUtcSlot(nowMs)}`,
       },
     },
   );
@@ -215,7 +223,9 @@ export async function handleRequest(
     });
   }
 
-  if (path === "/today.json") return metadataResponse(state.current, nowMs);
+  if (path === "/today.json") {
+    return metadataResponse(state.current, state.lastPromotion, nowMs);
+  }
 
   const originalCacheKey = cacheKey(request, state.current);
   let cached: Response | undefined;

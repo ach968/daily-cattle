@@ -64,6 +64,7 @@ class MemoryCache {
 
 function deps(options: {
   current?: SelectionEntry;
+  state?: Partial<ServiceState>;
   cache?: MemoryCache;
   fetcher?: typeof fetch;
   promoteFallback?: (
@@ -75,7 +76,10 @@ function deps(options: {
   const pending: Promise<unknown>[] = [];
   return {
     repository: new MemoryRepository(
-      serviceState({ current: options.current }),
+      serviceState({
+        ...options.state,
+        ...(options.current === undefined ? {} : { current: options.current }),
+      }),
     ) as unknown as StateRepository,
     cache,
     fetcher:
@@ -100,7 +104,16 @@ describe("handleRequest routes", () => {
     const current = entry({ provider, providerId });
     const response = await handleRequest(
       new Request("https://service/today.json"),
-      deps({ current }),
+      deps({
+        current,
+        state: {
+          lastPromotion: {
+            at: "2026-08-26T12:00:00.000Z",
+            status: "success",
+            detail: "promoted fresh",
+          },
+        },
+      }),
       NOW,
     );
 
@@ -108,6 +121,7 @@ describe("handleRequest routes", () => {
     expect(response.headers.get("content-type")).toContain("application/json");
     expect(await response.json()).toMatchObject({
       date: "2026-08-26",
+      slot: "2026-08-26T12:00:00.000Z",
       photoId: `${provider}:${providerId}`,
       provider,
       providerId,

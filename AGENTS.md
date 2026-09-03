@@ -4,7 +4,7 @@ These instructions apply to the entire repository.
 
 ## Project contract
 
-`daily-cattle` is a Cloudflare Worker that serves one verified cattle-in-a-pasture photograph per UTC day. `GET /` and `GET /today` return identical original image bytes, while `GET /today.json` returns attribution and selection metadata.
+`daily-cattle` is a Cloudflare Worker that serves one verified cattle-in-a-pasture photograph per 12-hour UTC slot. `GET /` and `GET /today` return identical original image bytes, while `GET /today.json` returns slot, attribution, and selection metadata.
 
 Keep the service keyless and suitable for Cloudflare's free tier. WordPress Photo Directory is the primary provider and Wikimedia Commons is the fallback. Do not add Flickr or another provider that requires an API key unless the user explicitly changes this requirement.
 
@@ -35,12 +35,12 @@ Keep validation fail-closed. Malformed provider data, unsupported licenses, inva
 - Accept only CC BY, CC BY-SA, CC0, or Public Domain licensing with canonical attribution metadata.
 - Keep the quality threshold at 75/100 and the shared preparation budget at no more than 20 AI evaluations per preparation run.
 - Keep provider order deterministic: WordPress first, Commons second.
-- Keep preparation scheduled every 12 hours at `11:45` and `23:45` UTC, and promotion daily at `00:00` UTC.
+- Keep preparation scheduled at `11:45` and `23:45` UTC, with promotion at `12:00` and `00:00` UTC respectively.
 - Keep at most nine verified reserves and retain the last 30 served provider-scoped photo IDs.
 - Store metadata and selection state in KV, never image files.
 - Keep downloaded or generated image files out of the repository.
 
-Do not loosen these constraints merely to make a test, benchmark, or daily selection pass. Change them only when the user explicitly requests a product-policy change.
+Do not loosen these constraints merely to make a test, benchmark, or slot selection pass. Change them only when the user explicitly requests a product-policy change.
 
 ## Cloudflare and deployment safety
 

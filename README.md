@@ -2,13 +2,13 @@
 
 [![Production health](https://github.com/ach968/daily-cattle/actions/workflows/production-health.yml/badge.svg)](https://github.com/ach968/daily-cattle/actions/workflows/production-health.yml)
 
-This Cloudflare Worker publishes one verified, high-quality, openly licensed photograph of cattle in a pasture for each UTC day. `GET /` and `GET /today` stream the same untouched upstream image bytes; `GET /today.json` provides the selected provider, canonical page, attribution, source URL, license, native dimensions, and selection metadata.
+This Cloudflare Worker publishes one verified, high-quality, openly licensed photograph of cattle in a pasture for each 12-hour UTC slot. `GET /` and `GET /today` stream the same untouched upstream image bytes; `GET /today.json` provides the slot, selected provider, canonical page, attribution, source URL, license, native dimensions, and selection metadata.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  subgraph Selection["Daily selection (UTC)"]
+  subgraph Selection["12-hour selection (UTC)"]
     Cron["Cron triggers"] --> Sources["WordPress Photos<br/>Wikimedia Commons"]
     Sources --> Filters["License + native 1920×1080<br/>landscape filters"]
     Filters --> AI["Workers AI<br/>quality gate ≥ 75"]
@@ -31,7 +31,7 @@ No image-provider key, account, card, or secret is required. Provider requests i
 
 Eligible images must be openly licensed under CC BY, CC BY-SA, CC0, or Public Domain. They must be native landscape images—at least 1920 pixels wide and 1080 pixels high, with width greater than height. The service stores provider metadata only, never image bytes, and streams the original upstream image without resizing, cropping, recompression, transformation, or upscaling.
 
-The quality gate is 75/100. Each preparation run shares a maximum budget of 20 preview submissions to Workers AI across both providers. It prepares the next UTC image and maintains up to nine verified reserve selections as a buffer. State also retains the last 30 served, globally namespaced photo IDs so recently served images do not reenter selection.
+The quality gate is 75/100. Each preparation run shares a maximum budget of 20 preview submissions to Workers AI across both providers. It prepares the next 12-hour UTC slot and maintains up to nine verified reserve selections as a buffer. State also retains the last 30 served, globally namespaced photo IDs so recently served images do not reenter selection.
 
 ## Cloudflare setup and deployment
 
@@ -72,7 +72,7 @@ It prints one result per preview and exits nonzero unless all ten expectations m
 
 ## Scheduled bootstrap and smoke check
 
-Preparation runs every 12 hours at `45 11,23 * * *`, while promotion remains daily at `0 0 * * *`; both schedules use UTC. After deployment, initialize production state through those scheduled handlers:
+Preparation runs every 12 hours at `45 11,23 * * *`, and promotion follows 15 minutes later at `0 0,12 * * *`; both schedules use UTC. After deployment, initialize production state through those scheduled handlers:
 
 ```bash
 npx wrangler dev --remote --test-scheduled
@@ -82,7 +82,7 @@ In a second terminal, invoke:
 
 ```bash
 curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=45+11%2C23+*+*+*&time=1787787900000&format=json"
-curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=0+0+*+*+*&time=1787788800000&format=json"
+curl "http://localhost:8787/cdn-cgi/handler/scheduled?cron=0+0%2C12+*+*+*&time=1787788800000&format=json"
 ```
 
 Both requests should report `"outcome":"ok"`. Stop remote development immediately afterward. Then verify the deployed service:
@@ -92,11 +92,11 @@ export SERVICE_URL="https://the-exact-workers-dev-url-from-wrangler"
 npm run smoke
 ```
 
-The smoke check downloads `/` and `/today`, confirms byte-identical image responses, and verifies the matching `/today.json` provider metadata, canonical attribution links, native dimensions, allowed license, MIME type, ETag, cache, and CORS headers.
+The smoke check downloads `/` and `/today`, confirms byte-identical image responses, and verifies the matching `/today.json` UTC slot, provider metadata, canonical attribution links, native dimensions, allowed license, MIME type, ETag, cache, and CORS headers.
 
 ## Production health monitoring
 
-Cloudflare remains the scheduler for preparation and promotion. GitHub Actions runs a separate production check every 12 hours at `00:17` and `12:17 UTC`, after the corresponding preparation window, and can also be run manually from the repository's Actions tab. The check fails when `/today.json` is unavailable, stale, retained from the previous day, malformed, or below the 75-point quality threshold. A reserve promotion is healthy because it still produces a new verified daily selection.
+Cloudflare remains the scheduler for preparation and promotion. GitHub Actions runs a separate production check every 12 hours at `00:17` and `12:17 UTC`, after the corresponding promotion, and can also be run manually from the repository's Actions tab. The check fails when `/today.json` is unavailable, stale for the current UTC slot, retained from the previous slot, malformed, or below the 75-point quality threshold. A reserve promotion is healthy because it still produces a new verified selection.
 
 Run the same check locally with:
 
@@ -104,11 +104,11 @@ Run the same check locally with:
 SERVICE_URL="https://daily-cattle.andrewkkchen.workers.dev" npm run health
 ```
 
-Cron-trigger changes can take up to 15 minutes to propagate. Workers KV is eventually consistent, so a request around UTC midnight can briefly return yesterday's verified selection. The service retains the verified quality and licensing gates and uses its reserve buffer rather than performing discovery during image requests.
+Cron-trigger changes can take up to 15 minutes to propagate. Workers KV is eventually consistent, so a request around `00:00` or `12:00 UTC` can briefly return the previous slot's verified selection. The service retains the verified quality and licensing gates and uses its reserve buffer rather than performing discovery during image requests.
 
 ## Attribution and local development
 
-Use `/today.json` as the attribution record: it supplies the provider, provider-scoped photo ID, canonical provider page, creator information when available, source URL, and license URL. Preserve those links and the selected license when republishing an image.
+Use `/today.json` as the attribution record: it supplies the UTC slot, provider, provider-scoped photo ID, canonical provider page, creator information when available, source URL, and license URL. Preserve those links and the selected license when republishing an image.
 
 For local development:
 

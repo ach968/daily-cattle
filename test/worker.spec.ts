@@ -129,7 +129,7 @@ describe("Worker fetch entrypoint", () => {
 describe("Worker scheduled entrypoint", () => {
   it.each([
     ["45 11,23 * * *", "prepare"],
-    ["0 0 * * *", "promote"],
+    ["0 0,12 * * *", "promote"],
   ] as const)("keeps the %s scheduled invocation open until %s finishes", async (cron, operation) => {
     let releaseLifecycle!: () => void;
     const lifecycle = operation === "prepare" ? lifecycleSpies.prepare : lifecycleSpies.promote;
@@ -165,7 +165,7 @@ describe("Worker scheduled entrypoint", () => {
 
   it.each([
     ["45 11,23 * * *", "prepare"],
-    ["0 0 * * *", "promote"],
+    ["0 0,12 * * *", "promote"],
   ] as const)("dispatches %s to only the %s lifecycle operation", async (cron, operation) => {
     const scheduledTime = Date.parse("2026-08-27T00:00:00.000Z");
     const ctx = createExecutionContext();

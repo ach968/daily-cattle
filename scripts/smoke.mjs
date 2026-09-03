@@ -118,6 +118,11 @@ export async function runSmoke(serviceUrl, fetcher = fetch) {
   const metadata = await metadataResponse.json();
   assert.ok(metadata && typeof metadata === "object", "metadata must be an object");
   assert.match(metadata.date, /^\d{4}-\d{2}-\d{2}$/);
+  assert.match(
+    metadata.slot,
+    /^\d{4}-\d{2}-\d{2}T(?:00|12):00:00\.000Z$/,
+    "metadata slot must identify a UTC 12-hour boundary",
+  );
   assert.ok(Number.isInteger(metadata.width) && metadata.width >= 1920);
   assert.ok(Number.isInteger(metadata.height) && metadata.height >= 1080);
   assert.ok(metadata.width > metadata.height, "image must be landscape");
@@ -130,6 +135,7 @@ export async function runSmoke(serviceUrl, fetcher = fetch) {
   return {
     photoId: metadata.photoId,
     date: metadata.date,
+    slot: metadata.slot,
     width: metadata.width,
     height: metadata.height,
   };
@@ -138,7 +144,7 @@ export async function runSmoke(serviceUrl, fetcher = fetch) {
 async function main() {
   const result = await runSmoke(process.env.SERVICE_URL);
   console.log(
-    `Smoke passed: ${result.photoId} for ${result.date} (${result.width}x${result.height})`,
+    `Smoke passed: ${result.photoId} for ${result.slot} (${result.width}x${result.height})`,
   );
 }
 

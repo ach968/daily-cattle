@@ -8,6 +8,7 @@ const NOW = new Date("2026-09-02T00:17:00.000Z");
 function metadata(overrides = {}) {
   return {
     date: "2026-09-02",
+    slot: "2026-09-02T00:00:00.000Z",
     photoId: "wordpress:123",
     origin: "fresh",
     quality: {
@@ -38,7 +39,7 @@ describe("runProductionHealthCheck", () => {
     });
   });
 
-  it("accepts a reserve promotion as a new daily selection", async () => {
+  it("accepts a reserve promotion as a new slot selection", async () => {
     await expect(
       runProductionHealthCheck(
         SERVICE_URL,
@@ -66,6 +67,18 @@ describe("runProductionHealthCheck", () => {
         NOW,
       ),
     ).rejects.toThrow(/not today in UTC/);
+  });
+
+  it("rejects a selection from the previous 12-hour UTC slot", async () => {
+    const afternoon = new Date("2026-09-02T12:17:00.000Z");
+
+    await expect(
+      runProductionHealthCheck(
+        SERVICE_URL,
+        fetchMetadata(metadata()),
+        afternoon,
+      ),
+    ).rejects.toThrow(/slot/);
   });
 
   it("rejects a selection below the 75-point production threshold", async () => {

@@ -18,6 +18,7 @@ import { SelectionEngine } from "../src/selector";
 import { eligiblePhoto, entry, quality, serviceState } from "./factories";
 
 const PREPARE_TIME = Date.parse("2026-08-26T23:45:00.000Z");
+const MORNING_PREPARE_TIME = Date.parse("2026-08-26T11:45:00.000Z");
 
 function candidate(
   provider: "wordpress" | "commons",
@@ -173,6 +174,19 @@ function preparedIds(state: ServiceState): string[] {
 }
 
 describe("SelectionEngine.prepare", () => {
+  it("targets the upcoming noon slot during morning preparation", async () => {
+    const { engine } = harness({
+      wordpress: { recent: [candidate("wordpress", "noon")] },
+    });
+
+    const result = await engine.prepare(serviceState(), MORNING_PREPARE_TIME);
+
+    expect(result.next).toMatchObject({
+      photoId: "wordpress:noon",
+      intendedDate: "2026-08-26",
+    });
+  });
+
   it("fills the ready set from WordPress before searching Commons", async () => {
     const searchLog: string[] = [];
     const { engine, commons, scorer } = harness({
