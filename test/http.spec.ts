@@ -132,6 +132,7 @@ describe("handleRequest routes", () => {
       license: "CC0",
       licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
       sourceUrl: "https://example.com/photos/photo-1/source.jpg",
+      displayUrl: "https://example.com/photos/photo-1/preview.jpg",
       width: 4032,
       height: 3024,
       quality: { total: 90, technical: 27, subject: 28 },

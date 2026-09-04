@@ -44,11 +44,13 @@ function validateProviderMetadata(metadata, canonical) {
   const providerId = requiredMetadataString(metadata, "providerId");
   const photoId = requiredMetadataString(metadata, "photoId");
   const sourceUrl = requiredMetadataString(metadata, "sourceUrl");
+  const displayUrl = requiredMetadataString(metadata, "displayUrl");
   const pageUrl = requiredMetadataString(metadata, "pageUrl");
 
   assert.equal(photoId, `${provider}:${providerId}`, "photoId must be provider-prefixed");
   assert.equal(pageUrl, canonical, "metadata and canonical Link disagree");
   assert.ok(isAbsoluteUrl(sourceUrl), "metadata sourceUrl must be HTTPS");
+  assert.ok(isAbsoluteUrl(displayUrl), "metadata displayUrl must be HTTPS");
   assert.ok(isAbsoluteUrl(pageUrl), "metadata pageUrl must be HTTPS");
   assert.ok(
     matchesHost(new URL(pageUrl).hostname, hosts.page),
@@ -57,6 +59,10 @@ function validateProviderMetadata(metadata, canonical) {
   assert.ok(
     matchesHost(new URL(sourceUrl).hostname, hosts.source),
     `${provider} source URL must use ${hosts.source}`,
+  );
+  assert.ok(
+    matchesHost(new URL(displayUrl).hostname, hosts.source),
+    `${provider} display URL must use ${hosts.source}`,
   );
 }
 

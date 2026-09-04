@@ -36,6 +36,7 @@ describe("runSmoke", () => {
       license: "CC0",
       pageUrl: "https://wordpress.org/photos/photo/296a697b04/",
       sourceUrl: "https://pd.w.org/2026/07/example.jpg",
+      displayUrl: "https://pd.w.org/2026/07/example-1024x768.jpg",
     };
 
     await expect(
@@ -57,6 +58,7 @@ describe("runSmoke", () => {
       license: "CC BY-SA",
       pageUrl: "https://commons.wikimedia.org/wiki/File:Cattle_pasture.jpg",
       sourceUrl: "https://upload.wikimedia.org/original.jpg",
+      displayUrl: "https://upload.wikimedia.org/preview.jpg",
     };
 
     await expect(
@@ -77,6 +79,11 @@ describe("runSmoke", () => {
       { sourceUrl: "https://pd.w.org/2026/07/example.jpg" },
       "commons source URL must use upload.wikimedia.org",
     ],
+    [
+      "missing display image metadata",
+      { displayUrl: undefined },
+      "displayUrl must be a non-empty string",
+    ],
   ])("rejects %s", async (_description, overrides, message) => {
     const metadata = {
       provider: "commons",
@@ -89,6 +96,7 @@ describe("runSmoke", () => {
       license: "CC BY-SA",
       pageUrl: "https://commons.wikimedia.org/wiki/File:Cattle_pasture.jpg",
       sourceUrl: "https://upload.wikimedia.org/original.jpg",
+      displayUrl: "https://upload.wikimedia.org/preview.jpg",
       ...overrides,
     };
 

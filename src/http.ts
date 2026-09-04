@@ -168,6 +168,7 @@ function metadataResponse(
       license: current.license,
       licenseUrl: current.licenseUrl,
       sourceUrl: current.sourceUrl,
+      displayUrl: current.previewUrl,
       width: current.width,
       height: current.height,
       quality: current.quality,

@@ -2,7 +2,7 @@
 
 [![Production health](https://github.com/ach968/daily-cattle/actions/workflows/production-health.yml/badge.svg)](https://github.com/ach968/daily-cattle/actions/workflows/production-health.yml)
 
-This Cloudflare Worker publishes one verified, high-quality, openly licensed photograph of cattle in a pasture for each 12-hour UTC slot. `GET /` and `GET /today` stream the same untouched upstream image bytes; `GET /today.json` provides the slot, selected provider, canonical page, attribution, source URL, license, native dimensions, and selection metadata.
+This Cloudflare Worker publishes one verified, high-quality, openly licensed photograph of cattle in a pasture for each 12-hour UTC slot. `GET /` and `GET /today` stream the same untouched upstream image bytes; `GET /today.json` provides the slot, selected provider, canonical page, attribution, original source URL, display-sized image URL, license, native dimensions, and selection metadata.
 
 ## Today's Cattle
 ![](https://daily-cattle.andrewkkchen.workers.dev/)
@@ -95,7 +95,7 @@ export SERVICE_URL="https://the-exact-workers-dev-url-from-wrangler"
 npm run smoke
 ```
 
-The smoke check downloads `/` and `/today`, confirms byte-identical image responses, and verifies the matching `/today.json` UTC slot, provider metadata, canonical attribution links, native dimensions, allowed license, MIME type, ETag, cache, and CORS headers.
+The smoke check downloads `/` and `/today`, confirms byte-identical image responses, and verifies the matching `/today.json` UTC slot, provider metadata, original and display image URLs, canonical attribution links, native dimensions, allowed license, MIME type, ETag, cache, and CORS headers.
 
 ## Production health monitoring
 
@@ -111,7 +111,7 @@ Cron-trigger changes can take up to 15 minutes to propagate. Workers KV is event
 
 ## Attribution and local development
 
-Use `/today.json` as the attribution record: it supplies the UTC slot, provider, provider-scoped photo ID, canonical provider page, creator information when available, source URL, and license URL. Preserve those links and the selected license when republishing an image.
+Use `/today.json` as the attribution record: it supplies the UTC slot, provider, provider-scoped photo ID, canonical provider page, creator information when available, original `sourceUrl`, smaller `displayUrl`, and license URL. Preserve those links and the selected license when republishing an image.
 
 For local development:
 
