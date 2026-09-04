@@ -4,6 +4,9 @@
 
 This Cloudflare Worker publishes one verified, high-quality, openly licensed photograph of cattle in a pasture for each 12-hour UTC slot. `GET /` and `GET /today` stream the same untouched upstream image bytes; `GET /today.json` provides the slot, selected provider, canonical page, attribution, source URL, license, native dimensions, and selection metadata.
 
+## Today's Cattle
+![](https://daily-cattle.andrewkkchen.workers.dev/)
+
 ## Architecture
 
 ```mermaid
