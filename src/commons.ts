@@ -17,6 +17,7 @@ const MAX_SEARCH_PAGES_PER_QUERY = 3;
 const METADATA_CACHE_TTL_MS = 60_000;
 const COMMONS_PAGE_HOST = "commons.wikimedia.org";
 const COMMONS_MEDIA_HOST = "upload.wikimedia.org";
+const COMMONS_THUMBNAIL_HOST = "thumb.wikimedia.org";
 const LICENSE_HOST = "creativecommons.org";
 
 type RejectionKind = "schema" | "license" | "media" | "dimensions" | "url";
@@ -102,16 +103,21 @@ function hostMatches(hostname: string, expected: string): boolean {
   return hostname === expected || hostname.endsWith(`.${expected}`);
 }
 
-function httpsUrl(value: unknown, expectedHost?: string): UrlResult {
+function httpsUrl(
+  value: unknown,
+  expectedHost?: string | readonly string[],
+): UrlResult {
   if (!nonEmptyString(value)) return { status: "malformed" };
   try {
     const url = new URL(value);
+    const expectedHosts = typeof expectedHost === "string" ? [expectedHost] : expectedHost;
     if (
       url.protocol !== "https:" ||
       url.username !== "" ||
       url.password !== "" ||
       url.hostname === "" ||
-      (expectedHost !== undefined && !hostMatches(url.hostname, expectedHost))
+      (expectedHosts !== undefined &&
+        !expectedHosts.some((host) => hostMatches(url.hostname, host)))
     ) {
       return { status: "disallowed" };
     }
@@ -196,7 +202,10 @@ function normalizePage(value: unknown): Normalization {
 
   const info = value.imageinfo[0];
   const sourceUrl = httpsUrl(info.url, COMMONS_MEDIA_HOST);
-  const previewUrl = httpsUrl(info.thumburl, COMMONS_MEDIA_HOST);
+  const previewUrl = httpsUrl(info.thumburl, [
+    COMMONS_MEDIA_HOST,
+    COMMONS_THUMBNAIL_HOST,
+  ]);
   if (sourceUrl.status === "disallowed" || previewUrl.status === "disallowed") {
     return rejected("url", true);
   }

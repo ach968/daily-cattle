@@ -75,6 +75,29 @@ function commonsPhoto(overrides: Record<string, unknown> = {}) {
 }
 
 describe("CommonsPhotoClient.search", () => {
+  it("accepts thumbnails served from the Commons thumbnail host", async () => {
+    const previewUrl =
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Cattle.jpg/1280px-Cattle.jpg";
+    const client = new CommonsPhotoClient(
+      fetchMock(async () =>
+        jsonResponse(
+          apiResponse([
+            page({ imageinfo: [imageInfo({ thumburl: previewUrl })] }),
+          ]),
+        ),
+      ),
+      logger(),
+    );
+
+    const candidates = await client.search(Date.now(), "all");
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]!.photo).toMatchObject({
+      sourceUrl: "https://upload.wikimedia.org/original.jpg",
+      previewUrl,
+    });
+  });
+
   it("sends strict Action API parameters and descriptive user agents", async () => {
     const calls: Array<{ url: URL; init?: RequestInit }> = [];
     const fetcher = fetchMock(async (input, init) => {
