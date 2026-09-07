@@ -10,7 +10,7 @@ export const WORDPRESS_ENDPOINT =
 export const WORDPRESS_LANDSCAPE_ORIENTATION_ID = 23;
 export const COMMONS_ENDPOINT = "https://commons.wikimedia.org/w/api.php";
 export const OUTBOUND_USER_AGENT =
-  "cattle-pic/1.0 (daily open cattle photo service; metadata at /today.json)";
+  "daily-cattle-bot/1.0 (https://github.com/ach968/daily-cattle)";
 export const PROVIDER_SEARCH_TERMS = [
   "cattle pasture",
   "cows grazing",

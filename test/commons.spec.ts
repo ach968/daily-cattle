@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { CommonsPhotoClient } from "../src/commons";
+import { OUTBOUND_USER_AGENT } from "../src/config";
 import { ProviderTransientError } from "../src/provider";
 import { eligiblePhoto } from "./factories";
 
@@ -129,8 +130,8 @@ describe("CommonsPhotoClient.search", () => {
     expect(params.get("maxlag")).toBe("5");
     expect(calls.every(({ init }) => init?.headers instanceof Headers)).toBe(true);
     const headers = calls[0]!.init!.headers as Headers;
-    expect(headers.get("user-agent")).toContain("cattle-pic/1.0");
-    expect(headers.get("api-user-agent")).toContain("cattle-pic/1.0");
+    expect(headers.get("user-agent")).toBe(OUTBOUND_USER_AGENT);
+    expect(headers.get("api-user-agent")).toBe(OUTBOUND_USER_AGENT);
   });
 
   it("uses relevance for the all-results pass", async () => {
@@ -411,6 +412,39 @@ describe("CommonsPhotoClient.search", () => {
 });
 
 describe("CommonsPhotoClient revalidation", () => {
+  it("identifies source availability requests to Wikimedia", async () => {
+    const requests: RequestInit[] = [];
+    const client = new CommonsPhotoClient(
+      fetchMock(async (_input, init) => {
+        requests.push(init ?? {});
+        if (init?.method === "HEAD") {
+          return new Response(null, { status: 405 });
+        }
+        return new Response(null, {
+          status: 206,
+          headers: { "content-type": "image/jpeg" },
+        });
+      }),
+      logger(),
+    );
+
+    await expect(client.isAvailable(commonsPhoto())).resolves.toBe(true);
+
+    expect(requests).toEqual([
+      {
+        method: "HEAD",
+        headers: { "User-Agent": OUTBOUND_USER_AGENT },
+      },
+      {
+        method: "GET",
+        headers: {
+          Range: "bytes=0-0",
+          "User-Agent": OUTBOUND_USER_AGENT,
+        },
+      },
+    ]);
+  });
+
   it("revalidates the stored original through pageids and source availability", async () => {
     const calls: URL[] = [];
     const client = new CommonsPhotoClient(

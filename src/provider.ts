@@ -1,3 +1,4 @@
+import { OUTBOUND_USER_AGENT } from "./config";
 import type { EligiblePhoto, PhotoProviderName } from "./model";
 
 export type SearchPass = "recent" | "all";
@@ -70,7 +71,7 @@ export async function checkSourceAvailability(
   const head = await sourceCheck(
     fetcher,
     photo.sourceUrl,
-    { method: "HEAD" },
+    { method: "HEAD", headers: { "User-Agent": OUTBOUND_USER_AGENT } },
     "source availability check",
   );
   if (head.status !== 405 && head.status !== 501) {
@@ -80,7 +81,13 @@ export async function checkSourceAvailability(
   const range = await sourceCheck(
     fetcher,
     photo.sourceUrl,
-    { method: "GET", headers: { Range: "bytes=0-0" } },
+    {
+      method: "GET",
+      headers: {
+        Range: "bytes=0-0",
+        "User-Agent": OUTBOUND_USER_AGENT,
+      },
+    },
     "source range check",
   );
   return checkResponse(range, "source range check");
