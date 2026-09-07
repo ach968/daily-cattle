@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { OUTBOUND_USER_AGENT } from "../src/config";
 import { eligiblePhoto } from "./factories";
 import {
   QUALITY_PROMPT,
@@ -188,7 +189,10 @@ describe("QualityScorer", () => {
     const result = await scorer.score(eligiblePhoto());
 
     expect(result).toMatchObject({ total: 88, passed: true });
-    expect(fetcher).toHaveBeenCalledWith("https://example.com/photos/photo-1/preview.jpg");
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://example.com/photos/photo-1/preview.jpg",
+      { headers: { "User-Agent": OUTBOUND_USER_AGENT } },
+    );
     expect(run).toHaveBeenCalledWith(
       "@cf/meta/llama-3.2-11b-vision-instruct",
       expect.objectContaining({

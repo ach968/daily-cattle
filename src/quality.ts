@@ -1,4 +1,4 @@
-import { QUALITY_THRESHOLD } from "./config";
+import { OUTBOUND_USER_AGENT, QUALITY_THRESHOLD } from "./config";
 import type { EligiblePhoto, QualityAssessment } from "./model";
 
 const VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct" as const;
@@ -169,7 +169,9 @@ export class QualityScorer {
   async score(photo: EligiblePhoto): Promise<QualityAssessment | null> {
     let image: number[];
     try {
-      const preview = await this.fetcher(photo.previewUrl);
+      const preview = await this.fetcher(photo.previewUrl, {
+        headers: { "User-Agent": OUTBOUND_USER_AGENT },
+      });
       if (!preview.ok) {
         this.reportFailure({
           photoId: photo.photoId,
