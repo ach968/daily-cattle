@@ -1,3 +1,4 @@
+import { OUTBOUND_USER_AGENT } from "./config";
 import { currentUtcSlot, secondsUntilNextUtcSlot } from "./day";
 import type { OperationalLogger } from "./lifecycle";
 import type { RunOutcome, SelectionEntry } from "./model";
@@ -83,7 +84,10 @@ async function fetchSource(
 ): Promise<Response | null> {
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     try {
-      const response = await fetcher(sourceUrl, { redirect: "follow" });
+      const response = await fetcher(sourceUrl, {
+        redirect: "follow",
+        headers: { "User-Agent": OUTBOUND_USER_AGENT },
+      });
       if (isImageResponse(response)) return response;
 
       const retry = attempt === 1 && transientStatus(response.status);

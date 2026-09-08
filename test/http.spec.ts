@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { OUTBOUND_USER_AGENT } from "../src/config";
 import { handleRequest, type RequestDeps } from "../src/http";
 import { promoteAvailableReserveIfCurrent } from "../src/lifecycle";
 import type { SelectionEntry, ServiceState } from "../src/model";
@@ -199,7 +200,10 @@ describe("handleRequest image streaming", () => {
     );
     expect(fetcher).toHaveBeenCalledWith(
       "https://example.com/photos/photo-1/source.jpg",
-      expect.objectContaining({ redirect: "follow" }),
+      expect.objectContaining({
+        redirect: "follow",
+        headers: { "User-Agent": OUTBOUND_USER_AGENT },
+      }),
     );
     expect(requestDeps.cache.matches).toEqual([
       "https://service/_cache/image/2026-08-26/wordpress:234123",
