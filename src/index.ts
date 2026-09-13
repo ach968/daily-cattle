@@ -1,4 +1,8 @@
-import { PREPARE_CRON, PROMOTE_CRON } from "./config";
+import {
+  MAX_EXTERNAL_SUBREQUESTS_PER_PREPARATION,
+  PREPARE_CRON,
+  PROMOTE_CRON,
+} from "./config";
 import { CommonsPhotoClient } from "./commons";
 import { handleRequest, type ResponseCache } from "./http";
 import {
@@ -10,15 +14,16 @@ import {
 import type { AppEnv } from "./model";
 import { ProviderRegistry } from "./providers";
 import { QualityScorer } from "./quality";
+import { createSubrequestBudgetedFetch } from "./request-budget";
 import { SelectionEngine } from "./selector";
 import { StateRepository } from "./state";
 import { WordPressPhotoClient } from "./wordpress";
 
 const runtimeFetch: typeof fetch = (...args) => globalThis.fetch(...args);
 
-function createProviderRegistry(): ProviderRegistry {
-  const wordpress = new WordPressPhotoClient(runtimeFetch, consoleLogger);
-  const commons = new CommonsPhotoClient(runtimeFetch, consoleLogger);
+function createProviderRegistry(fetcher: typeof fetch = runtimeFetch): ProviderRegistry {
+  const wordpress = new WordPressPhotoClient(fetcher, consoleLogger);
+  const commons = new CommonsPhotoClient(fetcher, consoleLogger);
   return new ProviderRegistry([wordpress, commons]);
 }
 
@@ -48,8 +53,12 @@ const worker = {
 
   async scheduled(controller, env, ctx) {
     const repository = new StateRepository(env.STATE);
-    const providers = createProviderRegistry();
-    const scorer = new QualityScorer(env.AI, runtimeFetch, (failure) => {
+    const preparationFetch = createSubrequestBudgetedFetch(
+      runtimeFetch,
+      MAX_EXTERNAL_SUBREQUESTS_PER_PREPARATION,
+    );
+    const providers = createProviderRegistry(preparationFetch);
+    const scorer = new QualityScorer(env.AI, preparationFetch, (failure) => {
       consoleLogger.error({
         event: "quality_scoring_failed",
         at: new Date(controller.scheduledTime).toISOString(),

@@ -13,7 +13,7 @@ import {
 const MIN_WIDTH = 1920;
 const MIN_HEIGHT = 1080;
 const MAX_ATTEMPTS = 3;
-const MAX_SEARCH_PAGES_PER_QUERY = 3;
+const MAX_SEARCH_PAGES_PER_QUERY = 1;
 const METADATA_CACHE_TTL_MS = 60_000;
 const COMMONS_PAGE_HOST = "commons.wikimedia.org";
 const COMMONS_MEDIA_HOST = "upload.wikimedia.org";

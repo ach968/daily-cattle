@@ -194,7 +194,7 @@ describe("CommonsPhotoClient.search", () => {
     expect(delays).toEqual([3000]);
   });
 
-  it("follows generator-search continuation tokens in order and keeps the rank after rejected pages", async () => {
+  it("does not follow continuation after a rejected first page", async () => {
     const urls: URL[] = [];
     const client = new CommonsPhotoClient(
       fetchMock(async (input) => {
@@ -216,15 +216,12 @@ describe("CommonsPhotoClient.search", () => {
 
     const candidates = await client.search(Date.now(), "all");
 
-    expect(candidates.map((candidate) => [candidate.photo.providerId, candidate.searchRank])).toEqual([
-      ["456", 1],
-    ]);
-    expect(urls).toHaveLength(6);
-    expect(urls[1]!.searchParams.get("continue")).toBe("gsroffset||");
-    expect(urls[1]!.searchParams.get("gsroffset")).toBe("20");
+    expect(candidates).toEqual([]);
+    expect(urls).toHaveLength(5);
+    expect(urls.every((url) => !url.searchParams.has("continue"))).toBe(true);
   });
 
-  it("bounds continuation processing to three pages per search phrase", async () => {
+  it("keeps each search phrase to one page for the preparation request budget", async () => {
     const fetcher = fetchMock(async (input) => {
       const url = new URL(String(input));
       const previous = url.searchParams.get("gsrcontinue");
@@ -241,7 +238,7 @@ describe("CommonsPhotoClient.search", () => {
 
     await client.search(Date.now(), "all");
 
-    expect(fetcher).toHaveBeenCalledTimes(15);
+    expect(fetcher).toHaveBeenCalledTimes(5);
   });
 
   it.each([

@@ -21,6 +21,8 @@ interface ScoredCandidate {
   providerPriority: number;
 }
 
+const MAX_FAILED_EVALUATIONS_PER_SEARCH_PASS = 3;
+
 function deterministicRank(date: string, photoId: string): number {
   let hash = 2_166_136_261;
   for (const character of `${date}:${photoId}`) {
@@ -177,17 +179,22 @@ export class SelectionEngine {
     const evaluatedSourceUrls = new Set<string>();
     const passers: ScoredCandidate[] = [];
     const requiredFreshPassers = 1 + Math.max(0, MAX_RESERVES - validReserve.length);
+    const evaluationBudget = Math.min(
+      MAX_EVALUATIONS_PER_PREPARATION,
+      Math.max(1, 1 + MAX_RESERVES - validReserve.length),
+    );
     let evaluationCount = 0;
 
     for (const [providerPriority, provider] of this.providers.providers.entries()) {
       for (const pass of ["recent", "all"] satisfies SearchPass[]) {
         if (
           passers.length >= requiredFreshPassers ||
-          evaluationCount >= MAX_EVALUATIONS_PER_PREPARATION
+          evaluationCount >= evaluationBudget
         ) {
           break;
         }
 
+        let failedEvaluations = 0;
         let candidates: RankedCandidate[];
         try {
           candidates = await provider.search(nowMs, pass);
@@ -207,7 +214,8 @@ export class SelectionEngine {
         for (const candidate of ordered) {
           if (
             passers.length >= requiredFreshPassers ||
-            evaluationCount >= MAX_EVALUATIONS_PER_PREPARATION
+            evaluationCount >= evaluationBudget ||
+            failedEvaluations >= MAX_FAILED_EVALUATIONS_PER_SEARCH_PASS
           ) {
             break;
           }
@@ -225,16 +233,21 @@ export class SelectionEngine {
           }
           evaluatedIds.add(photo.photoId);
           evaluatedSourceUrls.add(photo.sourceUrl);
+          evaluationCount += 1;
 
           try {
-            if (!(await provider.isAvailable(photo))) continue;
+            if (!(await provider.isAvailable(photo))) {
+              failedEvaluations += 1;
+              continue;
+            }
           } catch {
+            failedEvaluations += 1;
             continue;
           }
 
-          evaluationCount += 1;
           const assessment = await this.scorer.score(photo);
           if (!assessment) {
+            failedEvaluations += 1;
             this.logger.error({
               event: "quality_invalid",
               at: timestamp,
@@ -275,6 +288,8 @@ export class SelectionEngine {
           });
           if (passed) {
             passers.push({ entry, searchRank: candidate.searchRank, providerPriority });
+          } else {
+            failedEvaluations += 1;
           }
         }
       }

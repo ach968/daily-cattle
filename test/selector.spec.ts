@@ -234,24 +234,64 @@ describe("SelectionEngine.prepare", () => {
     expect(preparedIds(result)).toContain("commons:fallback-1");
   });
 
-  it("shares one 20-preview budget across both providers and search passes", async () => {
-    const wordpressCandidates = candidates("wordpress", "primary", 15);
-    const commonsCandidates = candidates("commons", "fallback", 10);
+  it("preserves evaluation budget for a passing wider Commons result", async () => {
+    const wordpressRecent = candidates("wordpress", "recent", 10);
+    const wordpressAll = candidates("wordpress", "all", 10);
+    const commonsRecent = candidates("commons", "recent", 10);
+    const commonsAll = candidates("commons", "all", 10);
+    const allCandidates = [
+      ...wordpressRecent,
+      ...wordpressAll,
+      ...commonsRecent,
+      ...commonsAll,
+    ];
     const assessments = new Map<string, number>(
-      wordpressCandidates.map(({ photo }) => [photo.photoId, 74]),
+      allCandidates.map(({ photo }) => [photo.photoId, 74]),
+    );
+    assessments.set("commons:all-1", 90);
+    const { engine, scorer } = harness({
+      wordpress: { recent: wordpressRecent, all: wordpressAll },
+      commons: { recent: commonsRecent, all: commonsAll },
+      assessments,
+    });
+
+    const result = await engine.prepare(serviceState(), PREPARE_TIME);
+
+    expect(result.next?.photoId).toBe("commons:all-1");
+    expect(scorer.seenIds).toHaveLength(10);
+  });
+
+  it("reduces the evaluation budget after revalidating reserves", async () => {
+    const reserve = Array.from({ length: 8 }, (_, index) =>
+      providerEntry("wordpress", `reserve-${index + 1}`),
+    );
+    const fresh = candidates("wordpress", "fresh", 10);
+    const assessments = new Map<string, number>(
+      fresh.map(({ photo }) => [photo.photoId, 74]),
     );
     const { engine, scorer } = harness({
-      wordpress: { recent: wordpressCandidates, all: [] },
-      commons: { recent: commonsCandidates },
+      wordpress: { recent: fresh },
       assessments,
+    });
+
+    await engine.prepare(serviceState({ reserve }), PREPARE_TIME);
+
+    expect(scorer.seenIds).toHaveLength(2);
+  });
+
+  it("counts unavailable candidates against the evaluation budget", async () => {
+    const fresh = candidates("wordpress", "fresh", 20);
+    const { engine, wordpress, scorer } = harness({
+      wordpress: {
+        recent: fresh,
+        unavailableIds: fresh.map(({ photo }) => photo.photoId),
+      },
     });
 
     await engine.prepare(serviceState(), PREPARE_TIME);
 
-    expect(scorer.seenIds).toHaveLength(20);
-    expect(scorer.seenIds.filter((id) => id.startsWith("commons:"))).toHaveLength(
-      5,
-    );
+    expect(wordpress.availabilityChecks.length).toBeLessThanOrEqual(10);
+    expect(scorer.seenIds).toEqual([]);
   });
 
   it("continues to Commons after transient WordPress search failures", async () => {
