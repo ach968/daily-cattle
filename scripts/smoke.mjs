@@ -71,16 +71,19 @@ export async function runSmoke(serviceUrl, fetcher = fetch) {
   const base = new URL(serviceUrl);
   const rootUrl = new URL("/", base);
   const imageUrl = new URL("/today", base);
+  const fullUrl = new URL("/full", base);
   const metadataUrl = new URL("/today.json", base);
 
-  const [root, first, second, metadataResponse] = await Promise.all([
+  const [root, first, second, full, fullAgain, metadataResponse] = await Promise.all([
     fetcher(rootUrl),
     fetcher(imageUrl),
     fetcher(imageUrl),
+    fetcher(fullUrl),
+    fetcher(fullUrl),
     fetcher(metadataUrl),
   ]);
 
-  for (const response of [root, first, second]) {
+  for (const response of [root, first, second, full, fullAgain]) {
     assert.ok(response.ok, `image endpoint returned HTTP ${response.status}`);
     assert.match(requiredHeader(response, "content-type"), /^image\//i);
     assert.equal(requiredHeader(response, "access-control-allow-origin"), "*");
@@ -96,7 +99,12 @@ export async function runSmoke(serviceUrl, fetcher = fetch) {
   assert.ok(rootBytes.equals(firstBytes), "/ and /today responses differ");
   assert.ok(firstBytes.equals(secondBytes), "repeated /today responses differ");
 
-  const linkHeaders = [root, first, second].map((response) =>
+  const fullBytes = Buffer.from(await full.arrayBuffer());
+  const fullAgainBytes = Buffer.from(await fullAgain.arrayBuffer());
+  assert.ok(fullBytes.length > 0, "/full returned an empty image");
+  assert.ok(fullBytes.equals(fullAgainBytes), "repeated /full responses differ");
+
+  const linkHeaders = [root, first, second, full, fullAgain].map((response) =>
     requiredHeader(response, "link"),
   );
   for (const linkHeader of linkHeaders) {
@@ -110,11 +118,9 @@ export async function runSmoke(serviceUrl, fetcher = fetch) {
       'Link rel="canonical" is required',
     );
   }
-  assert.equal(
-    linkHeaders[2],
-    linkHeaders[0],
-    "image endpoint Link headers differ",
-  );
+  for (const linkHeader of linkHeaders) {
+    assert.equal(linkHeader, linkHeaders[0], "image endpoint Link headers differ");
+  }
   const canonical = linkForRelation(linkHeaders[0], "canonical");
 
   assert.ok(

@@ -6,8 +6,8 @@ import { runSmoke } from "../scripts/smoke.mjs";
 const SERVICE_URL = "https://cattle-pic.example";
 
 function responseFor(url: string, metadata: Record<string, unknown>): Response {
-  if (url === `${SERVICE_URL}/` || url === `${SERVICE_URL}/today`) {
-    return new Response(new Uint8Array([1, 2, 3]), {
+  if (url === `${SERVICE_URL}/` || url === `${SERVICE_URL}/today` || url === `${SERVICE_URL}/full`) {
+    return new Response(new Uint8Array(url.endsWith("/full") ? [4, 5, 6, 7] : [1, 2, 3]), {
       headers: {
         "access-control-allow-origin": "*",
         "cache-control": "public, max-age=43200",
@@ -24,6 +24,26 @@ function responseFor(url: string, metadata: Record<string, unknown>): Response {
 }
 
 describe("runSmoke", () => {
+  it("rejects an unavailable full-resolution endpoint", async () => {
+    await expect(runSmoke(SERVICE_URL, async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith("/full")) return new Response(null, { status: 502 });
+      return responseFor(url, {});
+    })).rejects.toThrow("image endpoint returned HTTP 502");
+  });
+
+  it("rejects inconsistent repeated full-resolution responses", async () => {
+    let fullCalls = 0;
+    await expect(runSmoke(SERVICE_URL, async (input: string | URL | Request) => {
+      const url = String(input);
+      const response = responseFor(url, {});
+      if (url.endsWith("/full") && ++fullCalls === 2) {
+        return new Response(new Uint8Array([9]), { headers: response.headers });
+      }
+      return response;
+    })).rejects.toThrow("repeated /full responses differ");
+  });
+
   it("accepts matching WordPress image and metadata hosts", async () => {
     const metadata = {
       provider: "wordpress",

@@ -2,10 +2,23 @@
 
 [![Production health](https://github.com/ach968/daily-cattle/actions/workflows/production-health.yml/badge.svg)](https://github.com/ach968/daily-cattle/actions/workflows/production-health.yml)
 
-This Cloudflare Worker publishes one verified, high-quality, openly licensed photograph of cattle in a pasture for each 12-hour UTC slot. `GET /` and `GET /today` stream the same untouched upstream image bytes; `GET /today.json` provides the slot, selected provider, canonical page, attribution, original source URL, display-sized image URL, license, native dimensions, and selection metadata.
+This Cloudflare Worker publishes one verified, high-quality, openly licensed photograph of cattle in a pasture for each 12-hour UTC slot. `GET /` and `GET /today` stream the same provider-hosted preview bytes; `GET /full` streams the untouched full-resolution original; `GET /today.json` provides the slot, selected provider, canonical page, attribution, original source URL, display-sized image URL, license, native dimensions, and selection metadata.
 
 ## Today's Cattle
 ![](https://daily-cattle.andrewkkchen.workers.dev/)
+
+## Image endpoints
+
+| Endpoint | Response |
+| --- | --- |
+| `GET /` | Preview image for display |
+| `GET /today` | Alias for the preview |
+| `GET /full` | Full-resolution original image |
+| `GET /today.json` | Attribution and selection metadata |
+
+Use `/` for embeds and `/full` for the original. Existing clients that used `/` or `/today` for full resolution should switch to `/full`. Both sizes use the same selected photograph, with separate edge-cache entries and cache expiry at the next UTC slot boundary.
+
+The preview is the provider's existing display-sized image (typically 1024 pixels wide). The Worker streams both variants unchanged. Metadata `sourceUrl` and `displayUrl` remain direct provider URLs for the original and preview respectively; `width` and `height` describe the original.
 
 ## Architecture
 
@@ -21,18 +34,18 @@ flowchart LR
   Client["Client"] --> Worker["Cloudflare Worker"]
   Worker --> KV
   Worker --> Cache["Cloudflare edge cache"]
-  Cache -. cache miss .-> Origin["Original provider image"]
-  Cache --> Image["/ or /today<br/>image bytes"]
+  Cache -. cache miss .-> Origin["Provider preview or original"]
+  Cache --> Image["/ or /today: preview<br/>/full: original"]
   Worker --> Metadata["/today.json<br/>metadata"]
 ```
 
 ## Provider and selection policy
 
-The WordPress Photo Directory is the primary anonymous provider. Wikimedia Commons is the fallback only when WordPress cannot prepare the next image and fill available reserve slots. Discovery and selection run only in scheduled jobs; ordinary `/` and `/today` requests do not discover images or invoke Workers AI.
+The WordPress Photo Directory is the primary anonymous provider. Wikimedia Commons is the fallback only when WordPress cannot prepare the next image and fill available reserve slots. Discovery and selection run only in scheduled jobs; ordinary `/`, `/today`, and `/full` requests do not discover images or invoke Workers AI.
 
 No image-provider key, account, card, or secret is required. Provider requests identify this service with a descriptive User-Agent and generate low scheduled daily traffic. Wikimedia Commons uses bounded retry/backoff for transient failures. WordPress classifies transient search failures for the selection and fallback path but does not internally retry searches.
 
-Eligible images must be openly licensed under CC BY, CC BY-SA, CC0, or Public Domain. They must be native landscape images—at least 1920 pixels wide and 1080 pixels high, with width greater than height. The service stores provider metadata only, never image bytes, and streams the original upstream image without resizing, cropping, recompression, transformation, or upscaling.
+Eligible images must be openly licensed under CC BY, CC BY-SA, CC0, or Public Domain. They must be native landscape images—at least 1920 pixels wide and 1080 pixels high, with width greater than height. The service stores provider metadata only, never image bytes, and streams provider-hosted previews and originals without performing resizing, cropping, recompression, transformation, or upscaling.
 
 The quality gate is 75/100. Each preparation run shares a maximum budget of 20 preview submissions to Workers AI across both providers. It prepares the next 12-hour UTC slot and maintains up to nine verified reserve selections as a buffer. State also retains the last 30 served, globally namespaced photo IDs so recently served images do not reenter selection.
 
@@ -95,7 +108,7 @@ export SERVICE_URL="https://the-exact-workers-dev-url-from-wrangler"
 npm run smoke
 ```
 
-The smoke check downloads `/` and `/today`, confirms byte-identical image responses, and verifies the matching `/today.json` UTC slot, provider metadata, original and display image URLs, canonical attribution links, native dimensions, allowed license, MIME type, ETag, cache, and CORS headers.
+The smoke check downloads `/`, `/today`, and `/full`, confirms matching preview aliases and stable repeated responses for each size, and verifies the matching `/today.json` UTC slot, provider metadata, original and display image URLs, canonical attribution links, native dimensions, allowed license, MIME type, ETag, cache, and CORS headers.
 
 ## Production health monitoring
 

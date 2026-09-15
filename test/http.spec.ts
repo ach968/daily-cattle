@@ -146,7 +146,7 @@ describe("handleRequest routes", () => {
       (await handleRequest(new Request("https://service/nope"), deps(), NOW)).status,
     ).toBe(404);
     expect(
-      (await handleRequest(new Request("https://service/today"), deps(), NOW)).status,
+      (await handleRequest(new Request("https://service/full"), deps(), NOW)).status,
     ).toBe(503);
     expect(
       (await handleRequest(new Request("https://service/today.json"), deps(), NOW)).status,
@@ -155,23 +155,37 @@ describe("handleRequest routes", () => {
 });
 
 describe("handleRequest image streaming", () => {
-  it("serves the daily image from the default endpoint", async () => {
-    const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
-    const fetcher = vi.fn(async () =>
-      new Response(bytes, { headers: { "content-type": "image/jpeg" } }),
+  it("serves preview aliases and full resolution with isolated caches and ETags", async () => {
+    const current = entry();
+    const fetcher = vi.fn(async (input: RequestInfo | URL) =>
+      new Response(String(input) === current.previewUrl ? "preview bytes" : "original bytes", {
+        headers: { "content-type": "image/jpeg" },
+      }),
     ) as unknown as typeof fetch;
-    const requestDeps = deps({ current: entry(), fetcher });
+    const requestDeps = deps({ current, fetcher });
+    const cached = new Map<string, Response>();
+    requestDeps.cache.match = async (request) => cached.get(request.url)?.clone();
+    requestDeps.cache.put = async (request, response) => {
+      cached.set(request.url, response.clone());
+    };
 
-    const response = await handleRequest(
-      new Request("https://service/"),
-      requestDeps,
-      NOW,
-    );
+    const root = await handleRequest(new Request("https://service/"), requestDeps, NOW);
     await Promise.all(requestDeps.pending);
+    const full = await handleRequest(new Request("https://service/full"), requestDeps, NOW);
+    await Promise.all(requestDeps.pending);
+    const today = await handleRequest(new Request("https://service/today"), requestDeps, NOW);
+    const fullAgain = await handleRequest(new Request("https://service/full"), requestDeps, NOW);
 
-    expect(response.status).toBe(200);
-    expect(response.headers.get("content-type")).toBe("image/jpeg");
-    expect(new Uint8Array(await response.arrayBuffer())).toEqual(bytes);
+    expect(new Uint8Array(await root.arrayBuffer())).toEqual(new TextEncoder().encode("preview bytes"));
+    expect(new Uint8Array(await today.arrayBuffer())).toEqual(new TextEncoder().encode("preview bytes"));
+    expect(new Uint8Array(await full.arrayBuffer())).toEqual(new TextEncoder().encode("original bytes"));
+    expect(new Uint8Array(await fullAgain.arrayBuffer())).toEqual(new TextEncoder().encode("original bytes"));
+    expect(root.headers.get("etag")).not.toBe(full.headers.get("etag"));
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher).toHaveBeenCalledWith(current.previewUrl, expect.objectContaining({
+      headers: { "User-Agent": OUTBOUND_USER_AGENT },
+    }));
+    expect(fetcher).toHaveBeenCalledWith(current.sourceUrl, expect.any(Object));
   });
 
   it("streams untouched bytes and publishes attribution and UTC cache headers", async () => {
@@ -184,7 +198,7 @@ describe("handleRequest image streaming", () => {
     const requestDeps = deps({ current: entry(), fetcher });
 
     const response = await handleRequest(
-      new Request("https://service/today"),
+      new Request("https://service/full"),
       requestDeps,
       NOW,
     );
@@ -206,23 +220,23 @@ describe("handleRequest image streaming", () => {
       }),
     );
     expect(requestDeps.cache.matches).toEqual([
-      "https://service/_cache/image/2026-08-26/wordpress:234123",
+      "https://service/_cache/image/full/2026-08-26/wordpress:234123",
     ]);
     expect(requestDeps.cache.puts[0]?.key).toBe(
-      "https://service/_cache/image/2026-08-26/wordpress:234123",
+      "https://service/_cache/image/full/2026-08-26/wordpress:234123",
     );
   });
 
   it("uses a deterministic fallback ETag and serves a daily cache hit", async () => {
     const cache = new MemoryCache();
     cache.stored = new Response(new Uint8Array([1, 2, 3]), {
-      headers: { etag: '"source-wordpress:234123-2026-08-26"' },
+      headers: { etag: '"full-wordpress:234123-2026-08-26"' },
     });
     const fetcher = vi.fn() as unknown as typeof fetch;
     const requestDeps = deps({ current: entry(), cache, fetcher });
 
     const cached = await handleRequest(
-      new Request("https://service/today"),
+      new Request("https://service/full"),
       requestDeps,
       NOW,
     );
@@ -230,7 +244,7 @@ describe("handleRequest image streaming", () => {
     expect(new Uint8Array(await cached.arrayBuffer())).toEqual(
       new Uint8Array([1, 2, 3]),
     );
-    expect(cached.headers.get("etag")).toBe('"source-wordpress:234123-2026-08-26"');
+    expect(cached.headers.get("etag")).toBe('"full-wordpress:234123-2026-08-26"');
     expect(fetcher).not.toHaveBeenCalled();
 
     cache.stored = undefined;
@@ -240,12 +254,12 @@ describe("handleRequest image streaming", () => {
       }),
     ) as unknown as typeof fetch;
     const uncached = await handleRequest(
-      new Request("https://service/today"),
+      new Request("https://service/full"),
       requestDeps,
       NOW,
     );
     expect(uncached.headers.get("etag")).toBe(
-      '"source-wordpress:234123-2026-08-26"',
+      '"full-wordpress:234123-2026-08-26"',
     );
   });
 });
@@ -262,7 +276,7 @@ describe("handleRequest request-time fallback", () => {
     const promoteFallback = vi.fn(async () => null);
 
     const response = await handleRequest(
-      new Request("https://service/today"),
+      new Request("https://service/full"),
       deps({ current: entry(), fetcher, promoteFallback }),
       NOW,
     );
@@ -273,11 +287,12 @@ describe("handleRequest request-time fallback", () => {
     expect(promoteFallback).not.toHaveBeenCalled();
   });
 
-  it("promotes a verified reserve and invalidates the failed selection cache", async () => {
+  it.each(["preview", "full"] as const)("promotes a verified reserve and invalidates the failed %s cache", async (variant) => {
     const current = entry();
     const fallback = entry({
       photoId: "reserve-1",
       sourceUrl: "https://example.com/reserve.jpg",
+      previewUrl: "https://example.com/reserve-preview.jpg",
       intendedDate: "2026-08-26",
       origin: "reserve",
     });
@@ -294,7 +309,7 @@ describe("handleRequest request-time fallback", () => {
     const requestDeps = deps({ current, fetcher, promoteFallback });
 
     const response = await handleRequest(
-      new Request("https://service/today"),
+      new Request(variant === "full" ? "https://service/full" : "https://service/"),
       requestDeps,
       NOW,
     );
@@ -305,10 +320,10 @@ describe("handleRequest request-time fallback", () => {
     );
     expect(promoteFallback).toHaveBeenCalledWith("wordpress:234123", NOW);
     expect(requestDeps.cache.deletes).toEqual([
-      "https://service/_cache/image/2026-08-26/wordpress:234123",
+      `https://service/_cache/image/${variant}/2026-08-26/wordpress:234123`,
     ]);
     expect(fetcher).toHaveBeenLastCalledWith(
-      "https://example.com/reserve.jpg",
+      variant === "full" ? fallback.sourceUrl : fallback.previewUrl,
       expect.any(Object),
     );
   });
@@ -318,7 +333,7 @@ describe("handleRequest request-time fallback", () => {
     const promoteFallback = vi.fn(async () => null);
 
     const response = await handleRequest(
-      new Request("https://service/today"),
+      new Request("https://service/full"),
       deps({ current: entry(), fetcher, promoteFallback }),
       NOW,
     );
@@ -335,7 +350,7 @@ describe("handleRequest request-time fallback", () => {
     });
 
     const response = await handleRequest(
-      new Request("https://service/today"),
+      new Request("https://service/full"),
       deps({ current: entry(), fetcher, promoteFallback }),
       NOW,
     );
@@ -375,7 +390,7 @@ describe("handleRequest request-time fallback", () => {
     requestDeps.repository = repository as unknown as StateRepository;
 
     const image = await handleRequest(
-      new Request("https://service/today"),
+      new Request("https://service/full"),
       requestDeps,
       NOW,
     );
@@ -431,8 +446,8 @@ describe("handleRequest request-time fallback", () => {
     requestDeps.promoteFallback = conditionalPromoter;
 
     const [first, second] = await Promise.all([
-      handleRequest(new Request("https://service/today"), requestDeps, NOW),
-      handleRequest(new Request("https://service/today"), requestDeps, NOW),
+      handleRequest(new Request("https://service/full"), requestDeps, NOW),
+      handleRequest(new Request("https://service/full"), requestDeps, NOW),
     ]);
     const metadata = await handleRequest(
       new Request("https://service/today.json"),
@@ -461,7 +476,7 @@ describe("handleRequest request-time fallback", () => {
     ) as unknown as typeof fetch;
 
     const response = await handleRequest(
-      new Request("https://service/today"),
+      new Request("https://service/full"),
       deps({ current: entry(), cache, fetcher }),
       NOW,
     );
@@ -490,7 +505,7 @@ describe("handleRequest request-time fallback", () => {
       ) as unknown as typeof fetch;
 
     const response = await handleRequest(
-      new Request("https://service/today"),
+      new Request("https://service/full"),
       deps({ current: entry(), cache, fetcher, promoteFallback: async () => fallback }),
       NOW,
     );

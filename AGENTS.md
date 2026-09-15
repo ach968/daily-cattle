@@ -4,7 +4,7 @@ These instructions apply to the entire repository.
 
 ## Project contract
 
-`daily-cattle` is a Cloudflare Worker that serves one verified cattle-in-a-pasture photograph per 12-hour UTC slot. `GET /` and `GET /today` return identical original image bytes, while `GET /today.json` returns slot, attribution, and selection metadata.
+`daily-cattle` is a Cloudflare Worker that serves one verified cattle-in-a-pasture photograph per 12-hour UTC slot. `GET /` and `GET /today` return identical provider-hosted preview bytes, `GET /full` returns full-resolution original bytes, and `GET /today.json` returns slot, attribution, and selection metadata.
 
 Keep the service keyless and suitable for Cloudflare's free tier. WordPress Photo Directory is the primary provider and Wikimedia Commons is the fallback. Do not add Flickr or another provider that requires an API key unless the user explicitly changes this requirement.
 
@@ -31,7 +31,7 @@ Keep validation fail-closed. Malformed provider data, unsupported licenses, inva
 ## Invariants
 
 - Accept only native landscape images at least 1920 pixels wide and 1080 pixels high.
-- Stream original provider bytes; do not resize, crop, recompress, transform, or upscale images.
+- Stream provider-hosted preview bytes at `/` and `/today`, and original provider bytes at `/full`; do not resize, crop, recompress, transform, or upscale images in the Worker. Keep preview and full-resolution cache entries separate.
 - Accept only CC BY, CC BY-SA, CC0, or Public Domain licensing with canonical attribution metadata.
 - Keep the quality threshold at 75/100 and the shared preparation budget at no more than 20 AI evaluations per preparation run.
 - Keep provider order deterministic: WordPress first, Commons second.

@@ -51,10 +51,14 @@ function promoteFallbackSingleFlight(
   return flight;
 }
 
+function imageVariant(request: Request): "preview" | "full" {
+  return new URL(request.url).pathname === "/full" ? "full" : "preview";
+}
+
 function cacheKey(request: Request, current: SelectionEntry): Request {
   const origin = new URL(request.url).origin;
   return new Request(
-    `${origin}/_cache/image/${current.intendedDate}/${current.photoId}`,
+    `${origin}/_cache/image/${imageVariant(request)}/${current.intendedDate}/${current.photoId}`,
   );
 }
 
@@ -135,7 +139,7 @@ function publicImageResponse(
   if (!headers.has("etag")) {
     headers.set(
       "etag",
-      `"source-${current.photoId}-${current.intendedDate}"`,
+      `"${imageVariant(request)}-${current.photoId}-${current.intendedDate}"`,
     );
   }
 
@@ -195,7 +199,7 @@ async function serveSelection(
 ): Promise<Response | null> {
   const upstream = await fetchSource(
     deps.fetcher,
-    current.sourceUrl,
+    imageVariant(request) === "full" ? current.sourceUrl : current.previewUrl,
     deps.logger,
     current.photoId,
     nowMs,
@@ -215,7 +219,7 @@ export async function handleRequest(
   const path = new URL(request.url).pathname;
   if (
     request.method !== "GET" ||
-    (path !== "/" && path !== "/today" && path !== "/today.json")
+    (path !== "/" && path !== "/today" && path !== "/full" && path !== "/today.json")
   ) {
     return new Response("Not found", { status: 404 });
   }
