@@ -261,6 +261,53 @@ describe("SelectionEngine.prepare", () => {
     expect(scorer.seenIds).toHaveLength(10);
   });
 
+  it.each(["rejected", "invalid", "unavailable"] as const)(
+    "uses the remaining budget in the final pass after three %s candidates",
+    async (failure) => {
+      const recent = candidates("commons", "recent", 3);
+      const all = candidates("commons", "all", 4);
+      const failures = [...recent, ...all.slice(0, 3)];
+      const { engine, scorer } = harness({
+        commons: {
+          recent,
+          all,
+          unavailableIds: failure === "unavailable"
+            ? failures.map(({ photo }) => photo.photoId)
+            : [],
+        },
+        assessments: new Map(
+          failures.map(({ photo }) => [
+            photo.photoId,
+            failure === "invalid" ? null : 74,
+          ]),
+        ),
+      });
+
+      const result = await engine.prepare(serviceState(), PREPARE_TIME);
+
+      expect(result.next?.photoId).toBe("commons:all-4");
+      expect(result.lastPreparation?.status).toBe("success");
+      expect(scorer.seenIds).toContain("commons:all-4");
+    },
+  );
+
+  it("still limits total evaluations when the final pass keeps rejecting", async () => {
+    const recent = candidates("commons", "recent", 3);
+    const all = candidates("commons", "all", 20);
+    const { engine, scorer } = harness({
+      commons: { recent, all },
+      assessments: new Map(
+        [...recent, ...all].map(({ photo }) => [photo.photoId, 74]),
+      ),
+    });
+
+    const result = await engine.prepare(serviceState(), PREPARE_TIME);
+
+    expect(scorer.seenIds).toHaveLength(10);
+    expect(result.next).toBeUndefined();
+    expect(result.lastPreparation?.status).toBe("failed");
+  });
+
   it("reduces the evaluation budget after revalidating reserves", async () => {
     const reserve = Array.from({ length: 8 }, (_, index) =>
       providerEntry("wordpress", `reserve-${index + 1}`),

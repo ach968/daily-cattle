@@ -66,7 +66,7 @@ describe("runSmoke", () => {
     ).resolves.toMatchObject({ photoId: "wordpress:234123" });
   });
 
-  it("accepts matching Wikimedia Commons image and metadata hosts", async () => {
+  it.each(["upload.wikimedia.org", "thumb.wikimedia.org"])("accepts Wikimedia Commons previews from %s", async (host) => {
     const metadata = {
       provider: "commons",
       providerId: "123",
@@ -78,7 +78,7 @@ describe("runSmoke", () => {
       license: "CC BY-SA",
       pageUrl: "https://commons.wikimedia.org/wiki/File:Cattle_pasture.jpg",
       sourceUrl: "https://upload.wikimedia.org/original.jpg",
-      displayUrl: "https://upload.wikimedia.org/preview.jpg",
+      displayUrl: `https://${host}/preview.jpg`,
     };
 
     await expect(
@@ -103,6 +103,11 @@ describe("runSmoke", () => {
       "missing display image metadata",
       { displayUrl: undefined },
       "displayUrl must be a non-empty string",
+    ],
+    [
+      "a display URL outside the selected provider hosts",
+      { displayUrl: "https://thumb.wikimedia.org.example.com/preview.jpg" },
+      "commons display URL must use upload.wikimedia.org or thumb.wikimedia.org",
     ],
   ])("rejects %s", async (_description, overrides, message) => {
     const metadata = {

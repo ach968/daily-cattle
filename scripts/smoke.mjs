@@ -2,8 +2,12 @@ import assert from "node:assert/strict";
 import { pathToFileURL } from "node:url";
 
 const PROVIDER_HOSTS = {
-  wordpress: { page: "wordpress.org", source: "pd.w.org" },
-  commons: { page: "commons.wikimedia.org", source: "upload.wikimedia.org" },
+  wordpress: { page: "wordpress.org", source: "pd.w.org", display: ["pd.w.org"] },
+  commons: {
+    page: "commons.wikimedia.org",
+    source: "upload.wikimedia.org",
+    display: ["upload.wikimedia.org", "thumb.wikimedia.org"],
+  },
 };
 
 function requiredHeader(response, name) {
@@ -61,8 +65,8 @@ function validateProviderMetadata(metadata, canonical) {
     `${provider} source URL must use ${hosts.source}`,
   );
   assert.ok(
-    matchesHost(new URL(displayUrl).hostname, hosts.source),
-    `${provider} display URL must use ${hosts.source}`,
+    hosts.display.some((host) => matchesHost(new URL(displayUrl).hostname, host)),
+    `${provider} display URL must use ${hosts.display.join(" or ")}`,
   );
 }
 

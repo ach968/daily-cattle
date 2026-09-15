@@ -194,6 +194,11 @@ export class SelectionEngine {
           break;
         }
 
+        // Save budget for later searches, but do not abandon the final fallback
+        // while there are still candidates and evaluation budget remaining.
+        const hasLaterSearch =
+          pass === "recent" ||
+          providerPriority < this.providers.providers.length - 1;
         let failedEvaluations = 0;
         let candidates: RankedCandidate[];
         try {
@@ -215,7 +220,8 @@ export class SelectionEngine {
           if (
             passers.length >= requiredFreshPassers ||
             evaluationCount >= evaluationBudget ||
-            failedEvaluations >= MAX_FAILED_EVALUATIONS_PER_SEARCH_PASS
+            (hasLaterSearch &&
+              failedEvaluations >= MAX_FAILED_EVALUATIONS_PER_SEARCH_PASS)
           ) {
             break;
           }
